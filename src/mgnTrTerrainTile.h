@@ -51,11 +51,13 @@ namespace mgn {
             mutable int mHighlightMessage;  //!< highlight messages
 
             Heightmap * mTerrainMesh;
+            Heightmap * mFetchedTerrainMesh; // should be in sync
             std::vector<Label*> mLabelMeshes;
             std::vector<AtlasLabel*> mAtlasLabelMeshes;
             std::vector<Icon*> mPointUserMeshes;
 
             float *mHeightSamples;
+            float *mFetchedHeightSamples;
 
             graphics::Texture * mTexture;
 
@@ -114,6 +116,8 @@ namespace mgn {
             void fetchTexture();
             void fetchUserObjects();
 
+            bool isRefetchTerrain() const;
+            bool isRefetchTexture() const;
             bool isFetchedTerrain() const;
             bool isFetchedTexture() const;
             bool isFetchedLabels() const;

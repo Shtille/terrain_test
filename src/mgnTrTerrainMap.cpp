@@ -152,7 +152,7 @@ namespace mgn {
                 case mgnTerrainFetcher::FETCH_TERRAIN:
                     tile->generateMesh();
                     tile->mIsFetchedTerrain = true;
-                    if (!tile->mIsFetchedTexture || tile->mRefetchTexture)
+                    if (!tile->mIsFetchedTexture || tile->isRefetchTexture())
                     {
                         mFetcher->addCommand(mgnTerrainFetcher::CommandData(tile, mgnTerrainFetcher::FETCH_TEXTURE));
                         break;
@@ -163,12 +163,12 @@ namespace mgn {
                     if (tile->mNeedToGenerateLabels && tile->isFetchedLabels())
                         tile->generateLabels();
                     tile->mIsFetchedTexture = true;
-                    if (tile->mRefetchTerrain)
+                    if (tile->isRefetchTerrain())
                         mFetcher->addCommand(mgnTerrainFetcher::CommandData(tile, mgnTerrainFetcher::FETCH_TERRAIN));
                     else
                     {
                         mFetcher->addCommand(mgnTerrainFetcher::CommandData(tile, mgnTerrainFetcher::FETCH_USER_DATA));
-                        if (tile->mRefetchTexture)
+                        if (tile->isRefetchTexture())
                             mFetcher->addCommandLow(mgnTerrainFetcher::CommandData(tile, mgnTerrainFetcher::REFETCH_TEXTURE));
                     }
                     break;
@@ -177,7 +177,7 @@ namespace mgn {
                     tile->mIsFetched = true;
                     tile->generateUserObjects();
                     updateIconList(); // manual updating of icons when some new data appears
-                    if(!tile->mRefetchTexture)
+                    if(!tile->isRefetchTexture())
                         mTileCache->addTile(tile);
                     break;
                 case mgnTerrainFetcher::UPDATE_TRACKS:
@@ -189,7 +189,7 @@ namespace mgn {
                         tile->generateLabels();
                     tile->mIsFetchedTexture = true;
                     tile->mUpdateTextureRequested = false;
-                    if (tile->mRefetchTexture)
+                    if (tile->isRefetchTexture())
                         mFetcher->addCommandLow(mgnTerrainFetcher::CommandData(tile, mgnTerrainFetcher::REFETCH_TEXTURE));
                     else
                         mTileCache->addTile(tile);
@@ -325,7 +325,7 @@ namespace mgn {
             return mTileCache->getTile(tilekey);
         }
 
-        TerrainTile * TerrainMap::createNewTile( TileMap &tileMap, mgnTileKey tilekey, bool &created )
+        TerrainTile * TerrainMap::createNewTile( TileMap &tileMap, mgnTileKey tilekey, size_t priority, bool &created )
         {
             created = false;
 
@@ -338,6 +338,7 @@ namespace mgn {
                 mgnMdWorldRect rc = mTerrainView->getTileRect(tilekey.magIndex, tilekey.x, tilekey.y);
                 tile = new TerrainTile(this, tilekey, GeoSquare(rc), 0, 0);
                 created = true;
+                tile->priority = priority;
 
                 // start tile initialization from terrain fetching
                 mFetcher->addCommand(mgnTerrainFetcher::CommandData(tile, mgnTerrainFetcher::FETCH_TERRAIN));
@@ -468,13 +469,12 @@ namespace mgn {
             bool has_created = false, created = false;
             // Create tiles
             size_t sz = ts.tileKeys.size();
-            for (size_t keyind=0; keyind<sz; ++keyind)
+            for (size_t keyind = 0; keyind < sz; ++keyind)
             {
                 const mgnTileKey &tilekey = ts.tileKeys[keyind];
 
-                TerrainTile *tile = createNewTile(ts.tileMap, tilekey, created);
+                TerrainTile *tile = createNewTile(ts.tileMap, tilekey, sz - keyind, created);
                 has_created = has_created || created;
-                tile->priority = sz-keyind;
             }
 
             // Update tile sorting in queue to fetch

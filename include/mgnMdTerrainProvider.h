@@ -158,12 +158,14 @@ struct GeoTextureMap : GeoState
 {
     std::vector<unsigned char> mTextureData;
     std::vector<LabelPositionInfo> mLabelsInfo;
+    int key_x, key_y, key_z;
 
     bool mErrorOccurred; // any errors occurred
     bool mCosmosErrors;
     bool mNeedLabels;
 
-    GeoTextureMap() : mErrorOccurred(false), mCosmosErrors(false), mNeedLabels(true) {};
+    GeoTextureMap() : key_x(0), key_y(0), key_z(0)
+    , mErrorOccurred(false), mCosmosErrors(false), mNeedLabels(true) {};
 };
 
 struct PointUserObjectsInfo : GeoState

@@ -63,6 +63,10 @@ namespace mgn {
         }
         void Mesh::Render()
         {
+            assert(vertex_format_ != NULL);
+            assert(vertex_buffer_ != NULL);
+            assert(index_buffer_ != NULL);
+
             renderer_->ChangeVertexFormat(vertex_format_);
             renderer_->ChangeVertexBuffer(vertex_buffer_);
             renderer_->ChangeIndexBuffer(index_buffer_);

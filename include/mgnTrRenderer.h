@@ -35,6 +35,7 @@ namespace mgn {
         class ActiveTrackRenderer;
         class HighlightTrackRenderer;
         class TerrainMap;
+        class MercatorTree;
 
         // Main class for rendering
         class Renderer {
@@ -88,11 +89,14 @@ namespace mgn {
             VehicleRenderer * mVehicleRenderer;
             FakeTerrain * mFakeTerrain;
 
+            MercatorTree * mMercatorTree;
+
             graphics::Shader * mPositionShader;
             graphics::Shader * mPositionNormalShader;
             graphics::Shader * mPositionTexcoordShader;
             graphics::Shader * mPositionShadeTexcoordShader;
             graphics::Shader * mBillboardShader;
+            graphics::Shader * mMercatorTileShader;
 
             bool mHasWorldRectBeenSet;
         };

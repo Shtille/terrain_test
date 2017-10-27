@@ -155,6 +155,13 @@ public:
     void WorldToLocal (const mgnMdWorldPoint& wrld_pt, double &local_x, double &local_y) const;
     void LocalToWorld (double local_x, double local_y, mgnMdWorldPoint &wrld_pt) const;
 
+    void LocalToPixelDistance(float local_x, float& pixel_x, float map_size_max) const;
+    void PixelToLocalDistance(float pixel_x, float& local_x, float map_size_max) const;
+    void LocalToPixel(const vec3& local, vec3& pixel, float map_size_max) const;
+    void PixelLocation(vec3& pixel, float map_size_max) const;
+
+    void IntersectionWithRay(const vec3& ray, vec3& intersection) const;
+
     //####################################################################################
     //      UTILITES
     

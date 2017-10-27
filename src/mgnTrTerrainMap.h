@@ -104,7 +104,7 @@ namespace mgn {
             void updateTiles(mgnMdWorldPoint &location, TileSetParams &ts);
 
             TerrainTile * findTile( mgnTileKey tilekey);
-            TerrainTile * createNewTile( TileMap &tileMap, mgnTileKey tilekey, bool &created );
+            TerrainTile * createNewTile( TileMap &tileMap, mgnTileKey tilekey, size_t priority, bool &created );
 
             // recycle tile from specified tile set
             void recycleTile(TileMap::iterator &it, TileSetParams *ts);

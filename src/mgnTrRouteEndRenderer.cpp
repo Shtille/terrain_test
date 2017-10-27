@@ -28,6 +28,7 @@ namespace mgn {
                 mExists = true;
                 float cam_dist = (float)mTerrainView->getCamDistance();
                 mScale = std::max(cam_dist * 0.01f, 1.0f);
+                float dxm = ((float)mTerrainView->getMagnitude())/111111.f;
                 mPositions.clear();
                 for (std::vector<mgnMdWorldPoint>::const_iterator it = route_points.begin();
                     it != route_points.end(); ++it)
@@ -38,7 +39,10 @@ namespace mgn {
                     vec3 position;
                     position.x = (float)local_x;
                     position.z = (float)local_y;
-                    position.y = (float)provider->getAltitude(route_point.mLatitude, route_point.mLongitude);
+                    if (dxm > 0.05f) // since provider->fetchTerrain is retarded
+                        position.y = 0.2f;
+                    else
+                        position.y = (float)provider->getAltitude(route_point.mLatitude, route_point.mLongitude);
                     mPositions.push_back(position);
                 }
             }

@@ -93,7 +93,9 @@ namespace mgn {
         , mKey(key)
         , mGeoSquare(geoSquare)
         , mHeightSamples(NULL)
+        , mFetchedHeightSamples(NULL)
         , mTerrainMesh(NULL)
+        , mFetchedTerrainMesh(NULL)
         , mDrawFrame(-1)
         , mTexture(NULL)
         , mPosition(gx, 0.0f, gy)
@@ -120,10 +122,16 @@ namespace mgn {
             delete mHighlightTrackChunk;
 
             if (mHeightSamples)
+            {
                 delete[] mHeightSamples;
+                mHeightSamples = NULL;
+            }
 
             if (mTerrainMesh)
+            {
                 delete mTerrainMesh;
+                mTerrainMesh = NULL;
+            }
 
             for (size_t i=0; i<mLabelMeshes.size(); ++i)
                 delete mLabelMeshes[i];
@@ -137,10 +145,8 @@ namespace mgn {
             if (mTexture)
             {
                 mOwner->renderer_->DeleteTexture(mTexture);
-                mTexture = 0;
+                mTexture = NULL;
             }
-            mHeightSamples = 0;
-            mTerrainMesh = 0;
             mgnCriticalSectionDelete(&mCriticalSection);
         }
         void TerrainTile::updateTracks() // this function is called every frame
@@ -199,25 +205,19 @@ namespace mgn {
             sizeMetersLat = (float)mOwner->getTerrainView()->getCellSizeLat(mKey.magIndex);
             sizeMetersLon = (float)mOwner->getTerrainView()->getCellSizeLon(mKey.magIndex);
 
-            mRefetchTerrain = false;
-            mHeightSamples = new float[kTileHeightSamples * kTileHeightSamples];
-            GeoTerrain geoTerrain(kTileHeightSamples, kTileHeightSamples, mHeightSamples, 1);
+            float * height_samples = new float[kTileHeightSamples * kTileHeightSamples];
+            GeoTerrain geoTerrain(kTileHeightSamples, kTileHeightSamples, height_samples, 1);
             mOwner->mTerrainProvider.fetchTerrain(mGeoSquare, geoTerrain);
 
-            if (geoTerrain.mErrorOccurred)
-                mRefetchTerrain = true;
-
             Heightmap * terrain_mesh = new Heightmap(mOwner->renderer_,
-                kTileHeightSamples, kTileHeightSamples, mHeightSamples,
+                kTileHeightSamples, kTileHeightSamples, height_samples,
                 sizeMetersLon, sizeMetersLat);
 
-            if (mTerrainMesh)
-                delete mTerrainMesh;
-            mTerrainMesh = terrain_mesh;
-
-            // Adjust bounding box
-            mBoundingBox.center.y = 0.5f * (mTerrainMesh->maxHeight() + mTerrainMesh->minHeight());
-            mBoundingBox.extent.y = 0.5f * (mTerrainMesh->maxHeight() - mTerrainMesh->minHeight());
+            Lock();
+            mRefetchTerrain = geoTerrain.mErrorOccurred;
+            mFetchedTerrainMesh = terrain_mesh;
+            mFetchedHeightSamples = height_samples;
+            Unlock();
         }
 
         void TerrainTile::fetchTexture()
@@ -226,13 +226,12 @@ namespace mgn {
 
             Lock();
             geoTextureMap.mNeedLabels = !mIsFetchedLabels;
-            mRefetchTexture = false;
             Unlock();
 
             mOwner->mTerrainProvider.fetchTexture(mGeoSquare, geoTextureMap);
 
             Lock();
-            if (geoTextureMap.mErrorOccurred) mRefetchTexture = true;
+            mRefetchTexture = geoTextureMap.mErrorOccurred;
             if (geoTextureMap.mResult == GeoState::COMPLETE)
             {
                 std::swap(mTextureData, geoTextureMap.mTextureData);
@@ -258,6 +257,22 @@ namespace mgn {
             }
         }
 
+        bool TerrainTile::isRefetchTerrain() const
+        {
+            volatile bool refetch;
+            Lock();
+            refetch = mRefetchTerrain;
+            Unlock();
+            return refetch;
+        }
+        bool TerrainTile::isRefetchTexture() const
+        {
+            volatile bool refetch;
+            Lock();
+            refetch = mRefetchTexture;
+            Unlock();
+            return refetch;
+        }
         bool TerrainTile::isFetchedTerrain() const { return mIsFetchedTerrain; }
         bool TerrainTile::isFetchedTexture() const { return mIsFetchedTexture; }
         bool TerrainTile::isFetched       () const { return mIsFetched; }
@@ -273,6 +288,25 @@ namespace mgn {
 
         void TerrainTile::generateMesh()
         {
+            if (mTerrainMesh)
+                delete mTerrainMesh;
+            Lock();
+            if (mFetchedTerrainMesh)
+            {
+                mTerrainMesh = mFetchedTerrainMesh;
+                mFetchedTerrainMesh = NULL;
+            }
+            if (mFetchedHeightSamples)
+            {
+                mHeightSamples = mFetchedHeightSamples;
+                mFetchedHeightSamples = NULL;
+            }
+            Unlock();
+            assert(mTerrainMesh != NULL);
+            // Adjust bounding box
+            mBoundingBox.center.y = 0.5f * (mTerrainMesh->maxHeight() + mTerrainMesh->minHeight());
+            mBoundingBox.extent.y = 0.5f * (mTerrainMesh->maxHeight() - mTerrainMesh->minHeight());
+
             mTerrainMesh->MakeRenderable();
         }
 

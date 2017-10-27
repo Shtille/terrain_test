@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="Windows-1252"?>
+<VisualStudioPropertySheet
+	ProjectType="Visual C++"
+	Version="8.00"
+	Name="project_mgnTerrain"
+	InheritedPropertySheets="$(SolutionDir)base.vsprops;$(SolutionDir)modulecfg_jupiter.vsprops;$(JupiterRoot)Nova\Utilities\use_legacy_utilities.vsprops;$(JupiterRoot)Nova\Utilities\MapDrawing\use_mapDrawing.vsprops;$(JupiterRoot)Nova\Utilities\Core\use_core.vsprops;$(StandardVSProps)base_lib.vsprops"
+	>
+	<Tool
+		Name="VCCLCompilerTool"
+		AdditionalIncludeDirectories="&quot;$(JupiterRoot)Nova\Utilities\ExternalRteDB\include&quot;;&quot;$(JupiterRoot)Nova\Utilities\TrailDB\include&quot;;&quot;$(JupiterRoot)Nova\Utilities\mgnTerrain\include&quot;;&quot;$(JupiterRoot)Nova\Utilities\OnlineRasterMaps\include&quot;;&quot;$(JupiterRoot)..\EML\AppEngineInterface&quot;;&quot;$(MgnThirdPartyRoot)freetype\include&quot;"
+	/>
+</VisualStudioPropertySheet>

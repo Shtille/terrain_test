@@ -6,6 +6,8 @@
 #include "mgnLog.h"
 #include "../src/mgnMdUtils/mgnMdMapScale.h"
 
+#include "MapDrawing/Graphics/mgnCommonMath.h"
+
 // terrain maps are based on projection of uniform grid centered on a specific geographic long lat
 
 #define EarthCircumference 40075160.0
@@ -534,4 +536,88 @@ void mgnMdTerrainView::LocalToWorld (double local_x, double local_y, mgnMdWorldP
     // Shift world point to currently requested center
     wrld_pt.mLatitude  += location.mLatitude ;
     wrld_pt.mLongitude += location.mLongitude;
+}
+void mgnMdTerrainView::LocalToPixelDistance(float local_x, float& pixel_x, float map_size_max) const
+{
+    float longitude = local_x / 111111.0f;
+    pixel_x = longitude/360.0f * map_size_max;
+}
+void mgnMdTerrainView::PixelToLocalDistance(float pixel_x, float& local_x, float map_size_max) const
+{
+    float longitude = (pixel_x / map_size_max) * 360.0f;
+    local_x = longitude * 111111.0f;
+}
+void mgnMdTerrainView::LocalToPixel(const vec3& local, vec3& pixel, float map_size_max) const
+{
+    float longitude = local.x / 111111.0f + (float)mLocation.mLongitude;
+    float x = (longitude + 180.0f) / 360.0f;
+
+    float latitude = local.z / 111111.0f + (float)mLocation.mLatitude;
+    float sin_latitude = sin(latitude * math::kPi / 180.0f);
+    float y = 0.5f - log((1.0f + sin_latitude) / (1.0f - sin_latitude)) / (4.0f * math::kPi);
+
+    pixel.x = x * map_size_max; // we want East to be in positive direction of X axis
+    pixel.y = local.y / 360.0f * map_size_max / 111111.0f;
+    pixel.z = (1.0f - y) * map_size_max; // we want North to be in positive direction of Z axis
+}
+void mgnMdTerrainView::PixelLocation(vec3& pixel, float map_size_max) const
+{
+    float x = ((float)mLocation.mLongitude + 180.0f) / 360.0f;
+
+    float sin_latitude = sin((float)mLocation.mLatitude * math::kPi / 180.0f);
+    float y = 0.5f - log((1.0f + sin_latitude) / (1.0f - sin_latitude)) / (4.0f * math::kPi);
+
+    pixel.x = x * map_size_max; // we want East to be in positive direction of X axis
+    pixel.y = mCenterHeight / 360.0f * map_size_max / 111111.0f;
+    pixel.z = (1.0f - y) * map_size_max; // we want North to be in positive direction of Z axis
+}
+void mgnMdTerrainView::IntersectionWithRay(const vec3& ray, vec3& intersection) const
+{
+    if (!mTerrainProvider ||
+        getCamTiltRad() > 1.0 && // High altitudes, use approximate approach
+        ray.y < 0.0f)
+    {
+        vec3 origin = getCamPosition();
+        float d = -(float)getCenterHeight();
+        float t = -(origin.y + d)/ray.y;
+        intersection = origin + t * ray;
+        return;
+    }
+    mgnMdWorldPoint world_point;
+    float distance = getLargestCamDistance();
+    vec3 left_point = getCamPosition();
+    vec3 right_point = left_point + distance * ray;
+    LocalToWorld(left_point.x, left_point.z, world_point);
+    float left_height = (float)mTerrainProvider->getAltitude(world_point.mLatitude, world_point.mLongitude);
+    LocalToWorld(right_point.x, right_point.z, world_point);
+    float right_height = (float)mTerrainProvider->getAltitude(world_point.mLatitude, world_point.mLongitude);
+    if ((left_point.y - left_height)*(right_point.y - right_height) < 0.0f)
+    {
+        do
+        {
+            vec3 center_point = 0.5f*(left_point + right_point);
+            LocalToWorld(center_point.x, center_point.z, world_point);
+            float center_height = (float)mTerrainProvider->getAltitude(world_point.mLatitude, world_point.mLongitude);
+            if ((left_point.y - left_height)*(center_point.y - center_height) < 0.0f)
+            {
+                right_point = center_point;
+                right_height = center_height;
+            }
+            else
+            {
+                left_point = center_point;
+                left_height = center_height;
+            }
+            distance *= 0.5f; // equal to / 2
+        }
+        while (distance > 1.0f);
+
+        // We don't need an accurate value, so just take middle
+        intersection = 0.5f*(left_point + right_point);
+    }
+    else // no possible intersection
+    {
+        distance = (float)getCamDistance();
+        intersection = left_point + distance * ray;
+    }
 }

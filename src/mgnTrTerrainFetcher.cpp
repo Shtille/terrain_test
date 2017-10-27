@@ -319,16 +319,17 @@ namespace mgn {
 
                     //mDoneList.push_back(mCmdInProcess);
                     //mDoneList.sort();
-                    if ((!mDoneList.empty()) && (mDoneList.back().getWeight() > mCmdInProcess.getWeight()))
+                    //if ((!mDoneList.empty()) && (mDoneList.back().getWeight() > mCmdInProcess.getWeight()))
+                    //{
+                    //    // smart insert
+                    //    CommandData old = mDoneList.back();
+                    //    mDoneList.back() = mCmdInProcess;
+                    //    mDoneList.push_back(old);
+                    //}
+                    //else
                     {
-                        // smart insert
-                        CommandData old = mDoneList.back();
-                        mDoneList.back() = mCmdInProcess;
-                        mDoneList.push_back(old);
-                    }
-                    else
-                    {
-                        mDoneList.push_back(mCmdInProcess);
+                        mDoneList.push_front(mCmdInProcess);
+                        //mDoneList.sort();
                     }
 
                     mCmdInProcess = CommandData();
