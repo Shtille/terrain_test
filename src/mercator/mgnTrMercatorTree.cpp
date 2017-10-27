@@ -2,7 +2,6 @@
 
 #include "mgnTrMercatorNode.h"
 #include "mgnTrMercatorTileMesh.h"
-#include "mgnTrMercatorMap.h"
 #include "mgnTrMercatorRenderable.h"
 #include "mgnTrMercatorService.h"
 #include "mgnTrMercatorTaskStarter.h"
@@ -255,10 +254,10 @@ namespace mgn {
 
             // See if we can find a maptile to derive from.
             MercatorNode * ancestor = node;
-            while (ancestor->map_tile_ == 0 && ancestor->parent_) { ancestor = ancestor->parent_; };
+            while (!ancestor->has_map_tile_ && ancestor->parent_) { ancestor = ancestor->parent_; };
 
             // See if map tile found is in acceptable LOD range (ie. gridsize <= texturesize).
-            if (ancestor->map_tile_)
+            if (ancestor->has_map_tile_)
             {
                 int relativeLOD = node->lod_ - ancestor->lod_;
                 if (relativeLOD <= maxLOD)
@@ -266,13 +265,13 @@ namespace mgn {
                     // Replace existing renderable.
                     node->DestroyRenderable();
                     // Create renderable relative to the map tile.
-                    node->CreateRenderable(ancestor->map_tile_);
+                    node->CreateRenderable(&ancestor->map_tile_);
                     node->request_renderable_ = false;
                 }
             }
 
             // If no renderable was created, try creating a map tile.
-            if (node->request_renderable_ && !node->map_tile_ && !node->request_map_tile_)
+            if (node->request_renderable_ && !node->has_map_tile_ && !node->request_map_tile_)
             {
                 // Request a map tile for this node's LOD level.
                 node->request_map_tile_ = true;

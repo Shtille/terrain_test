@@ -7,15 +7,30 @@
 namespace mgn {
     namespace terrain {
 
-    	MercatorMapTile::MercatorMapTile(MercatorNode * node, graphics::Texture * albedo_texture)
-		: node_(node)
-		, albedo_texture_(albedo_texture)
+    	MercatorMapTile::MercatorMapTile()
+		: node_(NULL)
+		, albedo_texture_(NULL)
 		{
 		}
 		MercatorMapTile::~MercatorMapTile()
 		{
-			graphics::Renderer * renderer = node_->owner_->renderer_;
-			renderer->DeleteTexture(albedo_texture_);
+			Destroy();
+		}
+		void MercatorMapTile::Initialize(MercatorNode * node)
+		{
+			node_ = node;
+		}
+		void MercatorMapTile::Create()
+		{
+		}
+		void MercatorMapTile::Destroy()
+		{
+			if (albedo_texture_)
+			{
+				graphics::Renderer * renderer = node_->owner_->renderer_;
+				renderer->DeleteTexture(albedo_texture_);
+				albedo_texture_ = NULL;
+			}
 		}
 		MercatorNode * MercatorMapTile::GetNode()
 		{

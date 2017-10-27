@@ -2,6 +2,8 @@
 #ifndef __MGN_TERRAIN_MERCATOR_NODE_H__
 #define __MGN_TERRAIN_MERCATOR_NODE_H__
 
+#include "mgnTrMercatorMapTile.h"
+
 #include "../mgnTrMesh.h"
 
 class mgnMdTerrainView;
@@ -11,7 +13,6 @@ namespace mgn {
 
         // Forward declarations
         class MercatorTree;
-        class MercatorMapTile;
         class MercatorRenderable;
 
         //! Mercator tree node class
@@ -52,7 +53,7 @@ namespace mgn {
         private:
             MercatorTree * owner_; //!< owner tree
 
-            MercatorMapTile * map_tile_;
+            MercatorMapTile map_tile_;
             MercatorRenderable * renderable_;
 
             int lod_; //!< level of detail
@@ -64,6 +65,7 @@ namespace mgn {
 
             bool has_children_;
             bool page_out_;
+            bool has_map_tile_;
 
             bool request_page_out_;
             bool request_map_tile_;

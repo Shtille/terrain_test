@@ -18,8 +18,13 @@ namespace mgn {
 		//! Mercator map tile class
 		class MercatorMapTile {
 		public:
-			MercatorMapTile(MercatorNode * node, graphics::Texture * albedo_texture);
+			MercatorMapTile();
 			~MercatorMapTile();
+
+			void Initialize(MercatorNode * node);
+
+			void Create();
+			void Destroy();
 
 			MercatorNode * GetNode();
 			void BindTexture();
@@ -27,7 +32,7 @@ namespace mgn {
 			void SetImage(const graphics::Image& image);
 
 		private:
-			MercatorNode * node_;
+			MercatorNode * node_; //!< pointer to owner node
 			graphics::Texture * albedo_texture_;
 		};
 

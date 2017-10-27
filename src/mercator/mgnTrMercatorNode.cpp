@@ -3,7 +3,6 @@
 #include "mgnTrMercatorTileMesh.h"
 #include "mgnTrMercatorTree.h"
 #include "mgnTrMercatorMapTile.h"
-#include "mgnTrMercatorMap.h"
 #include "mgnTrMercatorRenderable.h"
 #include "mgnTrMercatorTaskTexture.h"
 #include "mgnTrMercatorService.h"
@@ -16,13 +15,14 @@ namespace mgn {
 
         MercatorNode::MercatorNode(MercatorTree * tree)
         : owner_(tree)
-        , map_tile_(NULL)
+        , map_tile_()
         , renderable_(NULL)
         , lod_(0)
         , x_(0)
         , y_(0)
         , has_children_(false)
         , page_out_(false)
+        , has_map_tile_(false)
         , request_page_out_(false)
         , request_map_tile_(false)
         , request_renderable_(false)
@@ -31,6 +31,7 @@ namespace mgn {
         , parent_slot_(-1)
         , parent_(NULL)
         {
+            map_tile_.Initialize(this);
             last_opened_ = last_rendered_ = owner_->GetFrameCounter();
             for (int i = 0; i < 4; ++i)
                 children_[i] = NULL;
@@ -112,15 +113,15 @@ namespace mgn {
         }
         void MercatorNode::CreateMapTile()
         {
-            if (map_tile_)
-                throw "Creating map tile that already exists.";
-            map_tile_ = new MercatorMapTile(this, NULL);
+            assert(!has_map_tile_);
+            has_map_tile_ = true;
+            map_tile_.Create();
             ++owner_->debug_info_.num_map_tiles;
         }
         void MercatorNode::DestroyMapTile()
         {
-            if (map_tile_) delete map_tile_;
-            map_tile_ = NULL;
+            map_tile_.Destroy();
+            has_map_tile_ = false;
             --owner_->debug_info_.num_map_tiles;
         }
         void MercatorNode::CreateRenderable(MercatorMapTile* map_tile)
@@ -205,10 +206,10 @@ namespace mgn {
                 if (!renderable_->IsInMIPRange())
                 {
                     // If there is already a native res map-tile...
-                    if (map_tile_)
+                    if (has_map_tile_)
                     {
                         // Make sure the renderable is up-to-date.
-                        if (renderable_->GetMapTile() == map_tile_)
+                        if (renderable_->GetMapTile() == &map_tile_)
                         {
                             // Split so we can try this again on the child tiles.
                             recurse = true;
@@ -220,7 +221,7 @@ namespace mgn {
                         // Make sure no parents are waiting for tile data update.
                         MercatorNode *ancestor = this;
                         bool parent_request = false;
-                        while (ancestor && !ancestor->map_tile_ && !ancestor->page_out_)
+                        while (ancestor && !ancestor->has_map_tile_ && !ancestor->page_out_)
                         {
                             if (ancestor->request_map_tile_ || ancestor->request_renderable_)
                             {
@@ -266,7 +267,7 @@ namespace mgn {
                                     min_level = level;
                             }
                             // If we are a shallow node with a tile that is not being rendered or close to being rendered.
-                            if (min_level > 1 && map_tile_ && false)
+                            if (min_level > 1 && has_map_tile_ && false)
                             {
                                 page_out_ = true;
                                 DestroyRenderable();
@@ -317,7 +318,7 @@ namespace mgn {
         }
         void MercatorNode::OnTextureTaskCompleted(const graphics::Image& image)
         {
-            map_tile_->SetImage(image);
+            map_tile_.SetImage(image);
         }
 
     } // namespace terrain
