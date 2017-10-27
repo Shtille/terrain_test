@@ -21,9 +21,7 @@ namespace mgn {
 			MercatorMapTile();
 			~MercatorMapTile();
 
-			void Initialize(MercatorNode * node);
-
-			void Create();
+			void Create(MercatorNode * node);
 			void Destroy();
 
 			MercatorNode * GetNode();

@@ -16,12 +16,9 @@ namespace mgn {
 		{
 			Destroy();
 		}
-		void MercatorMapTile::Initialize(MercatorNode * node)
+		void MercatorMapTile::Create(MercatorNode * node)
 		{
 			node_ = node;
-		}
-		void MercatorMapTile::Create()
-		{
 		}
 		void MercatorMapTile::Destroy()
 		{

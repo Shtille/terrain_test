@@ -16,13 +16,14 @@ namespace mgn {
         MercatorNode::MercatorNode(MercatorTree * tree)
         : owner_(tree)
         , map_tile_()
-        , renderable_(NULL)
+        , renderable_()
         , lod_(0)
         , x_(0)
         , y_(0)
         , has_children_(false)
         , page_out_(false)
         , has_map_tile_(false)
+        , has_renderable_(false)
         , request_page_out_(false)
         , request_map_tile_(false)
         , request_renderable_(false)
@@ -31,7 +32,6 @@ namespace mgn {
         , parent_slot_(-1)
         , parent_(NULL)
         {
-            map_tile_.Initialize(this);
             last_opened_ = last_rendered_ = owner_->GetFrameCounter();
             for (int i = 0; i < 4; ++i)
                 children_[i] = NULL;
@@ -48,13 +48,13 @@ namespace mgn {
         }
         const float MercatorNode::GetPriority() const
         {
-            if (!renderable_)
+            if (!has_renderable_)
             {
                 if (parent_)
                     return parent_->GetPriority();
                 return 0.0f;
             }
-            return renderable_->GetLodPriority();
+            return renderable_.GetLodPriority();
         }
         bool MercatorNode::IsSplit()
         {
@@ -90,22 +90,22 @@ namespace mgn {
         }
         void MercatorNode::PropagateLodDistances()
         {
-            if (renderable_)
+            if (has_renderable_)
             {
                 float max_child_distance = 0.0f;
                 // Get maximum LOD distance of all children.
                 for (int i = 0; i < 4; ++i)
                 {
-                    if (children_[i] && children_[i]->renderable_)
+                    if (children_[i] && children_[i]->has_renderable_)
                     {
                         // Increase LOD distance w/ centroid distances, to ensure proper LOD nesting.
-                        float child_distance = children_[i]->renderable_->GetLodDistance();
+                        float child_distance = children_[i]->renderable_.GetLodDistance();
                         if (max_child_distance < child_distance)
                             max_child_distance = child_distance;
                     }
                 }
                 // Store in renderable.
-                renderable_->SetChildLodDistance(max_child_distance);
+                renderable_.SetChildLodDistance(max_child_distance);
             }
             // Propagate changes to parent.
             if (parent_)
@@ -115,7 +115,7 @@ namespace mgn {
         {
             assert(!has_map_tile_);
             has_map_tile_ = true;
-            map_tile_.Create();
+            map_tile_.Create(this);
             ++owner_->debug_info_.num_map_tiles;
         }
         void MercatorNode::DestroyMapTile()
@@ -124,25 +124,25 @@ namespace mgn {
             has_map_tile_ = false;
             --owner_->debug_info_.num_map_tiles;
         }
-        void MercatorNode::CreateRenderable(MercatorMapTile* map_tile)
+        void MercatorNode::CreateRenderable(MercatorMapTile * map_tile)
         {
-            if (renderable_)
-                throw "Creating renderable that already exists.";
+            assert(!has_renderable_);
             if (page_out_)
                 page_out_ = false;
-            renderable_ = new MercatorRenderable(this, map_tile);
+            has_renderable_ = true;
+            renderable_.Create(this, map_tile);
             PropagateLodDistances();
         }
         void MercatorNode::DestroyRenderable()
         {
-            if (renderable_) delete renderable_;
-            renderable_ = NULL;
+            renderable_.Destroy();
+            has_renderable_ = false;
             PropagateLodDistances();
         }
         bool MercatorNode::WillRender()
         {
             // Being asked to render ourselves.
-            if (!renderable_)
+            if (!has_renderable_)
             {
                 last_opened_ = last_rendered_ = owner_->GetFrameCounter();
 
@@ -191,25 +191,25 @@ namespace mgn {
             }
 
             // If we are renderable, check LOD/visibility.
-            if (renderable_)
+            if (has_renderable_)
             {
-                renderable_->SetFrameOfReference();
+                renderable_.SetFrameOfReference();
 
                 // If invisible, return immediately.
-                if (renderable_->IsClipped())
+                if (renderable_.IsClipped())
                     return 1;
 
                 // Whether to recurse down.
                 bool recurse = false;
 
                 // If the texture is not fine enough...
-                if (!renderable_->IsInMIPRange())
+                if (!renderable_.IsInMIPRange())
                 {
                     // If there is already a native res map-tile...
                     if (has_map_tile_)
                     {
                         // Make sure the renderable is up-to-date.
-                        if (renderable_->GetMapTile() == &map_tile_)
+                        if (renderable_.GetMapTile() == &map_tile_)
                         {
                             // Split so we can try this again on the child tiles.
                             recurse = true;
@@ -241,7 +241,7 @@ namespace mgn {
                 }
 
                 // If the geometry is not fine enough...
-                if ((has_children_ || !request_map_tile_) && !renderable_->IsInLODRange())
+                if ((has_children_ || !request_map_tile_) && !renderable_.IsInLODRange())
                 {
                     // Go down an LOD level.
                     recurse = true;
@@ -299,15 +299,15 @@ namespace mgn {
             graphics::Shader * shader = owner_->shader_;
 
             // Vertex shader
-            shader->Uniform4fv("u_stuv_scale", renderable_->stuv_scale_);
-            shader->Uniform4fv("u_stuv_position", renderable_->stuv_position_);
-            shader->Uniform1f("u_skirt_height", renderable_->distance_);
+            shader->Uniform4fv("u_stuv_scale", renderable_.stuv_scale_);
+            shader->Uniform4fv("u_stuv_position", renderable_.stuv_position_);
+            shader->Uniform1f("u_skirt_height", renderable_.distance_);
 
             // Fragment shader
-            shader->Uniform4fv("u_color", renderable_->color_);
+            shader->Uniform4fv("u_color", renderable_.color_);
 
-            assert(renderable_->GetMapTile());
-            renderable_->GetMapTile()->BindTexture();
+            assert(renderable_.GetMapTile());
+            renderable_.GetMapTile()->BindTexture();
 
             owner_->tile_->Render();
         }

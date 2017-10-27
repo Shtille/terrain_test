@@ -294,9 +294,9 @@ namespace mgn {
             Request(node, REQUEST_RENDERABLE, true);
 
             // See if any child renderables use the old maptile.
-            if (node->renderable_)
+            if (node->has_renderable_)
             {
-                MercatorMapTile * old_tile = node->renderable_->GetMapTile();
+                MercatorMapTile * old_tile = node->renderable_.GetMapTile();
                 RefreshMapTile(node, old_tile);
             }
             return true;
@@ -339,10 +339,10 @@ namespace mgn {
                     !old_node->request_merge_ &&
                     (GetFrameCounter() - old_node->last_opened_ > 100))
                 {
-                    old_node->renderable_->SetFrameOfReference();
+                    old_node->renderable_.SetFrameOfReference();
                     // Make sure node's children are too detailed rather than just invisible.
-                    if (old_node->renderable_->IsFarAway() ||
-                        (old_node->renderable_->IsInLODRange() && old_node->renderable_->IsInMIPRange())
+                    if (old_node->renderable_.IsFarAway() ||
+                        (old_node->renderable_.IsInLODRange() && old_node->renderable_.IsInMIPRange())
                         )
                     {
                         old_node->request_merge_ = true;
@@ -361,7 +361,7 @@ namespace mgn {
             for (int i = 0; i < 4; ++i)
             {
                 MercatorNode* child = node->children_[i];
-                if (child && child->renderable_ && child->renderable_->GetMapTile() == tile)
+                if (child && child->has_renderable_ && child->renderable_.GetMapTile() == tile)
                 {
                     child->request_renderable_ = true;
                     Request(child, REQUEST_RENDERABLE, true);

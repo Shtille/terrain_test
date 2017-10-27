@@ -23,17 +23,34 @@ namespace {
 namespace mgn {
     namespace terrain {
 
-    	MercatorRenderable::MercatorRenderable(MercatorNode * node, MercatorMapTile * map_tile)
-		: node_(node)
-		, map_tile_(map_tile)
+    	MercatorRenderable::MercatorRenderable()
+		: node_(NULL)
+		, map_tile_(NULL)
+		, lod_priority_(0.0f)
 		, child_distance_(0.0f)
+		, lod_difference_(0.0f)
+		, distance_(0.0f)
+		, is_in_lod_range_(false)
+		, is_in_mip_range_(false)
+		, is_clipped_(false)
+		, is_far_away_(false)
 		{
-			AnalyzeTerrain();
-			InitDisplacementMapping();
 		}
 		MercatorRenderable::~MercatorRenderable()
 		{
+			Destroy();
+		}
+		void MercatorRenderable::Create(MercatorNode * node, MercatorMapTile * map_tile)
+		{
+			node_ = node;
+			map_tile_ = map_tile;
+			child_distance_ = 0.0f;
 
+			AnalyzeTerrain();
+			InitDisplacementMapping();
+		}
+		void MercatorRenderable::Destroy()
+		{
 		}
 		void MercatorRenderable::SetFrameOfReference()
 		{

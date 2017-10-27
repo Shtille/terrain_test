@@ -13,9 +13,13 @@ namespace mgn {
 
 		//! Mercator renderable class
 		class MercatorRenderable {
+			friend class MercatorNode;
 		public:
-			MercatorRenderable(MercatorNode * node, MercatorMapTile * map_tile);
+			MercatorRenderable();
 			~MercatorRenderable();
+
+			void Create(MercatorNode * node, MercatorMapTile * map_tile);
+			void Destroy();
 
 			void SetFrameOfReference();
 
@@ -28,12 +32,6 @@ namespace mgn {
 			void SetChildLodDistance(float lod_distance);
 
 			MercatorMapTile * GetMapTile();
-
-			// Additional params to map to shader
-			math::Vector4 stuv_scale_;
-			math::Vector4 stuv_position_;
-			math::Vector4 color_;
-			float distance_;
 
 		private:
 			void AnalyzeTerrain();
@@ -49,6 +47,12 @@ namespace mgn {
 			float lod_priority_; //!< priority for nodes queue processing
 			float child_distance_;
 			float lod_difference_;
+
+			// Additional params to map to shader
+			float distance_;
+			math::Vector4 stuv_scale_;
+			math::Vector4 stuv_position_;
+			math::Vector4 color_;
 
 			bool is_in_lod_range_;
 			bool is_in_mip_range_;
