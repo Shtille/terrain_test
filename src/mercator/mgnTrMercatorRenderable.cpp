@@ -16,7 +16,7 @@ namespace {
         if (ppx)
             *ppx = (qpx + 1.0f) * 0.5f * msm; // to range [0,msm]
         if (ppy)
-            *ppy = (qpy + 1.0f) * 0.5f * msm; // to range [0,msm]
+            *ppy = (1.0f - (qpy + 1.0f) * 0.5f) * msm; // to range [0,msm]
     }
 }
 

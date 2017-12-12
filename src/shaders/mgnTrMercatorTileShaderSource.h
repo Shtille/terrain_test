@@ -28,7 +28,7 @@ vec3 QuadPointToPixelPoint(vec2 quad_point, float height, float msm)\r\n\
     return vec3(                                                    \r\n\
     (quad_point.x + 1.0f) * 0.5f * msm,                             \r\n\
     height,                                                         \r\n\
-    (quad_point.y + 1.0f) * 0.5f * msm                              \r\n\
+    (1.0 - (quad_point.y + 1.0f) * 0.5f) * msm                              \r\n\
     );                                                              \r\n\
 }                                                                   \r\n\
                                                                     \r\n\

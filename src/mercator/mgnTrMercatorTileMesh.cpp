@@ -90,12 +90,12 @@ namespace mgn {
 				for (int i = 0; i < iGridSizeMinusOne; ++i)
 				{
 					*pIndex++ = index;
-					*pIndex++ = index + 1;
 					*pIndex++ = index + uGridSize;
+                    *pIndex++ = index + 1;
 
 					*pIndex++ = index + uGridSize;
-					*pIndex++ = index + 1;
 					*pIndex++ = index + uGridSize + 1;
+                    *pIndex++ = index + 1;
 
 					++index;
 				}
@@ -107,12 +107,12 @@ namespace mgn {
 			for (int i = 0; i < iGridSizeMinusOne; ++i)
 			{
 				*pIndex++ = index;
-				*pIndex++ = skirt_index;
 				*pIndex++ = index + 1;
+                *pIndex++ = skirt_index;
 
 				*pIndex++ = skirt_index;
-				*pIndex++ = skirt_index + 1;
 				*pIndex++ = index + 1;
+                *pIndex++ = skirt_index + 1;
 
 				index++;
 				skirt_index++;
@@ -122,12 +122,12 @@ namespace mgn {
 			for (int i = 0; i < iGridSizeMinusOne; ++i)
 			{
 				*pIndex++ = index;
-				*pIndex++ = index + 1;
 				*pIndex++ = skirt_index;
+                *pIndex++ = index + 1;
 
 				*pIndex++ = skirt_index;
-				*pIndex++ = index + 1;
 				*pIndex++ = skirt_index + 1;
+                *pIndex++ = index + 1;
 
 				index++;
 				skirt_index++;
@@ -138,12 +138,12 @@ namespace mgn {
 			for (int i = 0; i < iGridSizeMinusOne; ++i)
 			{
 				*pIndex++ = index;
-				*pIndex++ = index + uGridSize;
 				*pIndex++ = skirt_index;
+                *pIndex++ = index + uGridSize;
 
 				*pIndex++ = skirt_index;
-				*pIndex++ = index + uGridSize;
 				*pIndex++ = skirt_index + 1;
+                *pIndex++ = index + uGridSize;
 
 				index += uGridSize;
 				skirt_index++;
@@ -153,12 +153,12 @@ namespace mgn {
 			for (int i = 0; i < iGridSizeMinusOne; ++i)
 			{
 				*pIndex++ = index;
-				*pIndex++ = skirt_index;
 				*pIndex++ = index + uGridSize;
+                *pIndex++ = skirt_index;
 
 				*pIndex++ = skirt_index;
-				*pIndex++ = skirt_index + 1;
 				*pIndex++ = index + uGridSize;
+                *pIndex++ = skirt_index + 1;
 
 				index += uGridSize;
 				skirt_index++;
