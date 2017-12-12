@@ -36,13 +36,15 @@ namespace mgn {
         class HighlightTrackRenderer;
         class TerrainMap;
         class MercatorTree;
+        class MercatorProvider;
 
         // Main class for rendering
         class Renderer {
         public:
             Renderer(mgn::graphics::Renderer * renderer, int size_x, int size_y,
                 const char* font_path, float pixel_scale,
-                mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * terrain_provider);
+                mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * terrain_provider,
+                MercatorProvider * mercator_provider);
             ~Renderer();
 
             void Update();
@@ -77,6 +79,7 @@ namespace mgn {
 
             mgnMdTerrainView * mTerrainView;
             mgnMdTerrainProvider * mTerrainProvider;
+            MercatorProvider * mMercatorProvider;
             TerrainMap * mTerrainMap;
             DirectionalLineRenderer * mDirectionalLineRenderer;
             ActiveTrackRenderer * mActiveTrackRenderer;

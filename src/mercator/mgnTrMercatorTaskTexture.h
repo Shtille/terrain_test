@@ -9,16 +9,19 @@
 namespace mgn {
     namespace terrain {
 
+        class MercatorProvider;
+
         //! Texture task class
         class TextureTask : public Task {
         public:
-            TextureTask(MercatorNode * node);
+            TextureTask(MercatorNode * node, MercatorProvider * provider);
             ~TextureTask();
 
             void Execute(); /* override */
             void Process(); /* override */
 
         private:
+            MercatorProvider * provider_;
             graphics::Image image_;
         };
 

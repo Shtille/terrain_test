@@ -701,6 +701,10 @@
 				>
 			</File>
 			<File
+				RelativePath=".\include\mgnTrMercatorProvider.h"
+				>
+			</File>
+			<File
 				RelativePath=".\include\mgnTrRenderer.h"
 				>
 			</File>

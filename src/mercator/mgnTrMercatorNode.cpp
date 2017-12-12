@@ -46,6 +46,18 @@ namespace mgn {
             for (int i = 0; i < 4; ++i)
                 DetachChild(i);
         }
+        int MercatorNode::lod() const
+        {
+            return lod_;
+        }
+        int MercatorNode::x() const
+        {
+            return x_;
+        }
+        int MercatorNode::y() const
+        {
+            return y_;
+        }
         const float MercatorNode::GetPriority() const
         {
             if (!has_renderable_)
@@ -75,7 +87,9 @@ namespace mgn {
 
             has_children_ = true;
 
+#ifdef DEBUG
             ++owner_->debug_info_.num_nodes;
+#endif
         }
         void MercatorNode::DetachChild(int position)
         {
@@ -83,9 +97,12 @@ namespace mgn {
             {
                 delete children_[position];
                 children_[position] = NULL;
-                --owner_->debug_info_.num_nodes;
 
                 has_children_ = children_[0] || children_[1] || children_[2] || children_[3];
+
+#ifdef DEBUG
+                --owner_->debug_info_.num_nodes;
+#endif
             }
         }
         void MercatorNode::PropagateLodDistances()
@@ -116,13 +133,17 @@ namespace mgn {
             assert(!has_map_tile_);
             has_map_tile_ = true;
             map_tile_.Create(this);
+#ifdef DEBUG
             ++owner_->debug_info_.num_map_tiles;
+#endif
         }
         void MercatorNode::DestroyMapTile()
         {
             map_tile_.Destroy();
             has_map_tile_ = false;
+#ifdef DEBUG
             --owner_->debug_info_.num_map_tiles;
+#endif
         }
         void MercatorNode::CreateRenderable(MercatorMapTile * map_tile)
         {
@@ -296,6 +317,9 @@ namespace mgn {
         }
         void MercatorNode::RenderSelf()
         {
+            if (owner_->preprocess_)
+                return;
+
             graphics::Shader * shader = owner_->shader_;
 
             // Vertex shader
@@ -306,14 +330,13 @@ namespace mgn {
             // Fragment shader
             shader->Uniform4fv("u_color", renderable_.color_);
 
-            assert(renderable_.GetMapTile());
             renderable_.GetMapTile()->BindTexture();
 
             owner_->tile_->Render();
         }
         void MercatorNode::OnStarterTaskCompleted()
         {
-            owner_->service_->AddTask(new TextureTask(this));
+            owner_->service_->AddTask(new TextureTask(this, owner_->provider_));
             //service_->AddTask(new HeightmapTask(this));
         }
         void MercatorNode::OnTextureTaskCompleted(const graphics::Image& image)

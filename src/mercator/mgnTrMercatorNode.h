@@ -27,6 +27,10 @@ namespace mgn {
             explicit MercatorNode(MercatorTree * tree);
             virtual ~MercatorNode();
 
+            int lod() const;
+            int x() const;
+            int y() const;
+
             const float GetPriority() const;
 
             bool IsSplit();

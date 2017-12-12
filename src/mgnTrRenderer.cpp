@@ -48,12 +48,14 @@ namespace mgn {
 
     Renderer::Renderer(mgn::graphics::Renderer * renderer, int size_x, int size_y,
         const char* font_path, float pixel_scale,
-        mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * terrain_provider)
+        mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * terrain_provider,
+        MercatorProvider * mercator_provider)
     : mRenderer(renderer)
     , mSizeX(size_x)
     , mSizeY(size_y)
     , mTerrainView(terrain_view)
     , mTerrainProvider(terrain_provider)
+    , mMercatorProvider(mercator_provider)
     , mPositionShader(NULL)
     , mPositionNormalShader(NULL)
     , mPositionTexcoordShader(NULL)
@@ -92,7 +94,8 @@ namespace mgn {
             mPositionNormalShader);
         mFakeTerrain = new FakeTerrain(renderer, mPositionShader);
 #else
-        mMercatorTree = new MercatorTree(renderer, mMercatorTileShader, &mFrustum, terrain_view);
+        mMercatorTree = new MercatorTree(renderer, mMercatorTileShader, &mFrustum, terrain_view,
+            mercator_provider);
         mMercatorTree->Initialize();
 #endif
 

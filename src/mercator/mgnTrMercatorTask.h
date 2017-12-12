@@ -25,8 +25,6 @@ namespace mgn {
             virtual void Execute() = 0; //!< target task, done on service thread
             virtual void Process() = 0; //!< data processing after task is completed, done on main thread
 
-            static bool NodeMatchPredicate(Task * task);
-
         protected:
             MercatorNode * node_;
             int type_;

@@ -20,12 +20,15 @@ namespace mgn {
         class MercatorTileMesh;
         class MercatorMapTile;
         class MercatorService;
+        class MercatorProvider;
 
+#ifdef DEBUG
         struct MercatorDebugInfo {
             int num_nodes;
             int num_map_tiles;
             int maximum_achieved_lod;
         };
+#endif
 
         struct MercatorLodParams {
             int limit;
@@ -68,7 +71,8 @@ namespace mgn {
 
         public:
             MercatorTree(graphics::Renderer * renderer, graphics::Shader * shader,
-                math::Frustum * frustum, mgnMdTerrainView * terrain_view);
+                math::Frustum * frustum, mgnMdTerrainView * terrain_view,
+                MercatorProvider * provider);
             ~MercatorTree();
 
             //! Data video memory objects creation and other things that may fail
@@ -104,12 +108,14 @@ namespace mgn {
             void PruneTree();
             void RefreshMapTile(MercatorNode* node, MercatorMapTile* tile);
             void ProcessDoneTasks();
+            void PreprocessTree();
 
         private:
             graphics::Renderer * renderer_;     //!< pointer to renderer object
             graphics::Shader * shader_;         //!< pointer to shader object
             math::Frustum * frustum_;           //!< pointer to frustum object
             mgnMdTerrainView * terrain_view_;   //!< pointer to terrain view object
+            MercatorProvider * provider_;       //!< pointer to provider object
 
             MercatorNode * root_;
             unsigned int tile_capacity_;
@@ -126,9 +132,12 @@ namespace mgn {
 
             float earth_radius_;
             MercatorLodParams lod_params_;
+#ifdef DEBUG
             MercatorDebugInfo debug_info_;
+#endif
 
             int frame_counter_;
+            bool preprocess_;
             bool lod_freeze_;
             bool tree_freeze_;
         };

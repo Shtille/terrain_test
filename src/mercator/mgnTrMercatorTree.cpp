@@ -22,13 +22,16 @@ namespace mgn {
     namespace terrain {
 
         MercatorTree::MercatorTree(graphics::Renderer * renderer, graphics::Shader * shader,
-                math::Frustum * frustum, mgnMdTerrainView * terrain_view)
+                math::Frustum * frustum, mgnMdTerrainView * terrain_view,
+                MercatorProvider * provider)
         : renderer_(renderer)
         , shader_(shader)
         , frustum_(frustum)
         , terrain_view_(terrain_view)
+        , provider_(provider)
         , grid_size_(17)
         , frame_counter_(0)
+        , preprocess_(true)
         , lod_freeze_(false)
         , tree_freeze_(false)
         {
@@ -41,9 +44,11 @@ namespace mgn {
             const float kPlanetRadius = 6371000.0f;
             terrain_view->LocalToPixelDistance(kPlanetRadius, earth_radius_, GetMapSizeMax());
 
+#ifdef DEBUG
             debug_info_.num_nodes = 1;
             debug_info_.num_map_tiles = 0;
             debug_info_.maximum_achieved_lod = 0;
+#endif
         }
         MercatorTree::~MercatorTree()
         {
@@ -75,8 +80,22 @@ namespace mgn {
         }
         void MercatorTree::Update()
         {
-            // Handle delayed requests (for rendering new tiles).
-            HandleRenderRequests();
+            // Update LOD state.
+            if (!lod_freeze_)
+            {
+                vec3 cam_position_pixel;
+                terrain_view_->LocalToPixel(terrain_view_->getCamPosition(), cam_position_pixel,
+                    MercatorTree::GetMapSizeMax());
+                lod_params_.camera_position = cam_position_pixel;
+                lod_params_.camera_front = frustum_->getDir();
+            }
+
+            // Preprocess tree for the first time
+            if (preprocess_)
+            {
+                PreprocessTree();
+                preprocess_ = false;
+            }
 
             if (!tree_freeze_)
             {
@@ -87,15 +106,8 @@ namespace mgn {
                 HandleInlineRequests();
             }
 
-            // Update LOD state.
-            if (!lod_freeze_)
-            {
-                vec3 cam_position_pixel;
-                terrain_view_->LocalToPixel(terrain_view_->getCamPosition(), cam_position_pixel,
-                    MercatorTree::GetMapSizeMax());
-                lod_params_.camera_position = cam_position_pixel;
-                lod_params_.camera_front = frustum_->getDir();
-            }
+            // Handle delayed requests (for rendering new tiles).
+            HandleRenderRequests();
         }
         void MercatorTree::Render()
         {
@@ -119,8 +131,10 @@ namespace mgn {
                 MercatorNode* child = new MercatorNode(node->owner_);
                 node->AttachChild(child, i);
             }
+#ifdef DEBUG
             if (debug_info_.maximum_achieved_lod < node->lod_ + 1)
                 debug_info_.maximum_achieved_lod = node->lod_ + 1;
+#endif
         }
         void MercatorTree::MergeQuadTreeNode(MercatorNode* node)
         {
@@ -386,6 +400,17 @@ namespace mgn {
                     delete task;
                 }
             }
+        }
+        void MercatorTree::PreprocessTree()
+        {
+            do
+            {
+                HandleInlineRequests();
+                HandleRenderRequests();
+                if (root_->WillRender())
+                    root_->Render();
+            }
+            while (!render_requests_.empty() || !inline_requests_.empty());
         }
         const int MercatorTree::grid_size() const
         {
