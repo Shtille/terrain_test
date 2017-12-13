@@ -327,9 +327,6 @@ namespace mgn {
             shader->Uniform4fv("u_stuv_position", renderable_.stuv_position_);
             shader->Uniform1f("u_skirt_height", renderable_.distance_);
 
-            // Fragment shader
-            shader->Uniform4fv("u_color", renderable_.color_);
-
             renderable_.GetMapTile()->BindTexture();
 
             owner_->tile_->Render();

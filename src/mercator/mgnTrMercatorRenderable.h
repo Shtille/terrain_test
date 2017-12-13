@@ -52,7 +52,9 @@ namespace mgn {
 			float distance_;
 			math::Vector4 stuv_scale_;
 			math::Vector4 stuv_position_;
+#ifdef DEBUG
 			math::Vector4 color_;
+#endif
 
 			bool is_in_lod_range_;
 			bool is_in_mip_range_;

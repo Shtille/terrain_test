@@ -26,9 +26,9 @@ varying vec2 v_texcoord;                                     \r\n\
 vec3 QuadPointToPixelPoint(vec2 quad_point, float height, float msm)\r\n\
 {                                                                   \r\n\
     return vec3(                                                    \r\n\
-    (quad_point.x + 1.0f) * 0.5f * msm,                             \r\n\
+    (quad_point.x + 1.0) * 0.5 * msm,                               \r\n\
     height,                                                         \r\n\
-    (1.0 - (quad_point.y + 1.0f) * 0.5f) * msm                              \r\n\
+    (1.0 - (quad_point.y + 1.0) * 0.5) * msm                        \r\n\
     );                                                              \r\n\
 }                                                                   \r\n\
                                                                     \r\n\
@@ -59,14 +59,12 @@ precision highp float;                                        \r\n\
 // ====================================                       \r\n\
                                                               \r\n\
 uniform sampler2D u_texture;                                  \r\n\
-uniform lowp vec4 u_color; // for debug purposes              \r\n\
                                                               \r\n\
 varying vec2 v_texcoord;                                      \r\n\
                                                               \r\n\
 void main()                                                   \r\n\
 {                                                             \r\n\
-    gl_FragColor = texture2D(u_texture, v_texcoord) * u_color;\r\n\
-    gl_FragColor = texture2D(u_texture, v_texcoord);\r\n\
+    gl_FragColor = texture2D(u_texture, v_texcoord);          \r\n\
 }";
 
 #endif

@@ -311,7 +311,8 @@ namespace mgn {
             if (node->has_renderable_)
             {
                 MercatorMapTile * old_tile = node->renderable_.GetMapTile();
-                RefreshMapTile(node, old_tile);
+                if (old_tile != NULL)
+                    RefreshMapTile(node, old_tile);
             }
             return true;
         }

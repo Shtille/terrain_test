@@ -219,12 +219,13 @@ namespace mgn {
 			stuv_position_.z = texture_x;
 			stuv_position_.w = texture_y;
 
+#ifdef DEBUG
 			// Set color/tint
 			color_.x = cosf(map_tile_->GetNode()->lod_ * 0.70f) * .35f + .85f;
 			color_.y = cosf(map_tile_->GetNode()->lod_ * 1.71f) * .35f + .85f;
 			color_.z = cosf(map_tile_->GetNode()->lod_ * 2.64f) * .35f + .85f;
 			color_.w = 1.0f;
-			//color_ = math::Vector4(1.0f);
+#endif
 		}
 
     } // namespace terrain
