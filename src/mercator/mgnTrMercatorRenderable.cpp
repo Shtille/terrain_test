@@ -52,6 +52,22 @@ namespace mgn {
 		void MercatorRenderable::Destroy()
 		{
 		}
+        void MercatorRenderable::Update(MercatorNode * node, MercatorMapTile * map_tile)
+        {
+            if (node != node_)
+            {
+                // Full recreation
+                Destroy();
+                Create(node, map_tile);
+            }
+            else if (map_tile != map_tile_)
+            {
+                // Update just map tile dependent functions
+                map_tile_ = map_tile;
+                child_distance_ = 0.0f;
+                InitDisplacementMapping();
+            }
+        }
 		void MercatorRenderable::SetFrameOfReference()
 		{
 			const MercatorLodParams& params = node_->owner_->lod_params_;

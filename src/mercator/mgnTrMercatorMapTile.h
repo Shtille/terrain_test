@@ -27,6 +27,8 @@ namespace mgn {
 			MercatorNode * GetNode();
 			void BindTexture();
 
+            bool HasAlbedoTexture() const;
+
 			void SetImage(const graphics::Image& image);
 
 		private:

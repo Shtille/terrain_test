@@ -38,6 +38,10 @@ namespace mgn {
 			graphics::Renderer * renderer = node_->owner_->renderer_;
 			renderer->ChangeTexture(albedo_texture_, 0U);
 		}
+        bool MercatorMapTile::HasAlbedoTexture() const
+        {
+            return albedo_texture_ != NULL;
+        }
 		void MercatorMapTile::SetImage(const graphics::Image& image)
 		{
 			if (albedo_texture_)

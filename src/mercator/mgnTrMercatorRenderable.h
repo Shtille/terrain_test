@@ -20,6 +20,7 @@ namespace mgn {
 
 			void Create(MercatorNode * node, MercatorMapTile * map_tile);
 			void Destroy();
+            void Update(MercatorNode * node, MercatorMapTile * map_tile);
 
 			void SetFrameOfReference();
 
