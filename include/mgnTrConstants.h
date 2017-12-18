@@ -8,6 +8,9 @@ namespace mgn {
     int GetTileResolution();
     int GetTileHeightSamples();
 
+    const float GetHeightMin();
+    const float GetHeightRange();
+
     } // namespace terrain
 } // namespace mgn
 

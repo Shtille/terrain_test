@@ -51,8 +51,8 @@ namespace mgn {
             void RenderSelf();
 
             // Task functions
-            void OnStarterTaskCompleted();
             void OnTextureTaskCompleted(const graphics::Image& image);
+            void OnHeightmapTaskCompleted(const graphics::Image& image);
 
         private:
             MercatorTree * owner_; //!< owner tree
@@ -78,12 +78,15 @@ namespace mgn {
             bool request_split_;
             bool request_merge_;
 
+            bool request_albedo_;
+            bool request_heightmap_;
+
             int parent_slot_;
             MercatorNode * parent_;
             MercatorNode * children_[4];
         };
 
-        // Quadtree node comparison for LOD age.
+        // Quad tree node comparison for LOD age.
         class MercatorNodeCompareLastOpened {
         public:
             bool operator()(const MercatorNode* a, const MercatorNode* b) const {

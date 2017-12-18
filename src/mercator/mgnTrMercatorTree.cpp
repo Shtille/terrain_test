@@ -4,7 +4,9 @@
 #include "mgnTrMercatorTileMesh.h"
 #include "mgnTrMercatorRenderable.h"
 #include "mgnTrMercatorService.h"
-#include "mgnTrMercatorTaskStarter.h"
+
+#include "mgnTrMercatorTaskTexture.h"
+#include "mgnTrMercatorTaskHeightmap.h"
 
 #include "mgnMdTerrainView.h"
 
@@ -93,7 +95,7 @@ namespace mgn {
             // Preprocess tree for the first time
             if (preprocess_)
             {
-                PreprocessTree();
+                //PreprocessTree();
                 preprocess_ = false;
             }
 
@@ -218,7 +220,9 @@ namespace mgn {
             int limit = 1000;
             bool sorted = false;
 
-            while (!requests.empty())
+            // Added request count to not stuck into the cycle (some handlers may duplicate requests)
+            RequestQueue::size_type num_requests = requests.size();
+            while (!requests.empty() && num_requests != 0)
             {
                 RequestType request = *requests.begin();
                 MercatorNode* node = request.node;
@@ -232,6 +236,8 @@ namespace mgn {
                 }
 
                 requests.pop_front();
+                --num_requests;
+
                 // Call handler.
                 if ((this->*handlers[request.type])(node))
                 {
@@ -266,11 +272,11 @@ namespace mgn {
                 maxLOD++;
             }
 
-            // See if we can find a maptile to derive from.
+            // See if we can find a map tile to derive from.
             MercatorNode * ancestor = node;
             while (!ancestor->has_map_tile_ && ancestor->parent_) { ancestor = ancestor->parent_; };
 
-            // See if map tile found is in acceptable LOD range (ie. gridsize <= texturesize).
+            // See if map tile found is in acceptable LOD range (ie. grid size <= texturesize).
             if (ancestor->has_map_tile_)
             {
                 int relativeLOD = node->lod_ - ancestor->lod_;
@@ -295,26 +301,49 @@ namespace mgn {
         }
         bool MercatorTree::HandleMapTile(MercatorNode* node)
         {
-            // Add a starter task for this node
-            Task * task = new StarterTask(node);
-            service_->AddTask(task);
-
             // Assemble a map tile object for this node.
-            node->CreateMapTile();
+            //node->CreateMapTile();
             node->request_map_tile_ = false;
 
-            // Request a new renderable to match.
-            node->request_renderable_ = true;
-            Request(node, REQUEST_RENDERABLE, true);
+            bool has_albedo = node->map_tile_.HasAlbedoTexture();
+            bool has_heightmap = node->map_tile_.HasHeightmapTexture();
 
-            // See if any child renderables use the old maptile.
-            if (node->has_renderable_)
+            if (!has_albedo && !node->request_albedo_)
             {
-                MercatorMapTile * old_tile = node->renderable_.GetMapTile();
-                if (old_tile != NULL)
-                    RefreshMapTile(node, old_tile);
+                node->request_albedo_ = true;
+                service_->AddTask(new TextureTask(node, provider_));
             }
-            return true;
+            if (!has_heightmap && !node->request_heightmap_)
+            {
+                node->request_heightmap_ = true;
+                service_->AddTask(new HeightmapTask(node, provider_));
+            }
+            bool tile_filled = has_albedo && has_heightmap;
+            if (tile_filled)
+            {
+                // Map tile is complete and can be used as ancestor
+                node->has_map_tile_ = true;
+
+                // Request a new renderable to match.
+                node->request_renderable_ = true;
+                Request(node, REQUEST_RENDERABLE, true);
+
+                // See if any child renderables use the old map tile.
+                if (node->has_renderable_)
+                {
+                    MercatorMapTile * old_tile = node->renderable_.GetMapTile();
+                    RefreshMapTile(node, old_tile);
+                }
+
+                return true;
+            }
+            else // ! tile_filled
+            {
+                // Repeat this request until is done
+                node->request_map_tile_ = true;
+                Request(node, REQUEST_MAPTILE, false);
+                return false;
+            }
         }
         bool MercatorTree::HandleSplit(MercatorNode* node)
         {

@@ -640,11 +640,11 @@
 					>
 				</File>
 				<File
-					RelativePath=".\src\mercator\mgnTrMercatorTaskStarter.cpp"
+					RelativePath=".\src\mercator\mgnTrMercatorTaskHeightmap.cpp"
 					>
 				</File>
 				<File
-					RelativePath=".\src\mercator\mgnTrMercatorTaskStarter.h"
+					RelativePath=".\src\mercator\mgnTrMercatorTaskHeightmap.h"
 					>
 				</File>
 				<File

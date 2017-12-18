@@ -17,8 +17,14 @@ namespace mgn {
                 graphics::Image * image;
                 bool errors_occured;
             };
+            struct HeightmapInfo {
+                int key_x, key_y, key_z; //!< tile coordinates in Mercator projection
+                graphics::Image * image;
+                bool errors_occured;
+            };
 
             virtual void GetTexture(TextureInfo & texture_info) = 0;
+            virtual void GetHeightmap(HeightmapInfo & heightmap_info) = 0;
         };
 
     } // namespace terrain

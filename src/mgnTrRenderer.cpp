@@ -33,6 +33,7 @@
 #define MGNTR_MERCATOR_TILE
 
 #ifdef MGNTR_MERCATOR_TILE
+#include "mgnTrConstants.h"
 #include "mercator/mgnTrMercatorTree.h"
 #endif
 
@@ -405,8 +406,11 @@ namespace mgn {
             if (mMercatorTileShader)
             {
                 mMercatorTileShader->Bind();
-                mMercatorTileShader->Uniform1i("u_texture", 0);
                 mMercatorTileShader->Uniform1f("u_map_size_max", MercatorTree::GetMapSizeMax());
+                mMercatorTileShader->Uniform1f("u_height_min", GetHeightMin());
+                mMercatorTileShader->Uniform1f("u_height_range", GetHeightRange());
+                mMercatorTileShader->Uniform1i("u_texture", 0);
+                mMercatorTileShader->Uniform1i("u_height_map", 1);
                 mMercatorTileShader->Unbind();
             }
         }

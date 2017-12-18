@@ -16,7 +16,6 @@ namespace mgn {
         }
         void TextureTask::Execute()
         {
-            int tiles_per_side = 1 << node_->lod();
             MercatorProvider::TextureInfo texture_info;
             texture_info.key_x = node_->x();
             texture_info.key_y = node_->y();

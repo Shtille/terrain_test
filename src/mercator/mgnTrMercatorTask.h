@@ -6,7 +6,6 @@ namespace mgn {
     namespace terrain {
 
         enum MercatorRequestType {
-            REQUEST_STARTER,
             REQUEST_TEXTURE,
             REQUEST_HEIGHTMAP
         };

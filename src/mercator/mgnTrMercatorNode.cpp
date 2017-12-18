@@ -4,7 +4,6 @@
 #include "mgnTrMercatorTree.h"
 #include "mgnTrMercatorMapTile.h"
 #include "mgnTrMercatorRenderable.h"
-#include "mgnTrMercatorTaskTexture.h"
 #include "mgnTrMercatorService.h"
 
 #include <cstddef>
@@ -15,7 +14,7 @@ namespace mgn {
 
         MercatorNode::MercatorNode(MercatorTree * tree)
         : owner_(tree)
-        , map_tile_()
+        , map_tile_(this)
         , renderable_()
         , lod_(0)
         , x_(0)
@@ -29,6 +28,8 @@ namespace mgn {
         , request_renderable_(false)
         , request_split_(false)
         , request_merge_(false)
+        , request_albedo_(false)
+        , request_heightmap_(false)
         , parent_slot_(-1)
         , parent_(NULL)
         {
@@ -331,14 +332,15 @@ namespace mgn {
 
             owner_->tile_->Render();
         }
-        void MercatorNode::OnStarterTaskCompleted()
-        {
-            owner_->service_->AddTask(new TextureTask(this, owner_->provider_));
-            //service_->AddTask(new HeightmapTask(this));
-        }
         void MercatorNode::OnTextureTaskCompleted(const graphics::Image& image)
         {
-            map_tile_.SetImage(image);
+            request_albedo_ = false;
+            map_tile_.SetAlbedoImage(image);
+        }
+        void MercatorNode::OnHeightmapTaskCompleted(const graphics::Image& image)
+        {
+            request_heightmap_ = false;
+            map_tile_.SetHeightmapImage(image);
         }
 
     } // namespace terrain

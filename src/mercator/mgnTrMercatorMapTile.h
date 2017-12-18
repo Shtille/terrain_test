@@ -19,6 +19,7 @@ namespace mgn {
 		class MercatorMapTile {
 		public:
 			MercatorMapTile();
+            MercatorMapTile(MercatorNode * node);
 			~MercatorMapTile();
 
 			void Create(MercatorNode * node);
@@ -28,12 +29,15 @@ namespace mgn {
 			void BindTexture();
 
             bool HasAlbedoTexture() const;
+            bool HasHeightmapTexture() const;
 
-			void SetImage(const graphics::Image& image);
+			void SetAlbedoImage(const graphics::Image& image);
+            void SetHeightmapImage(const graphics::Image& image);
 
 		private:
 			MercatorNode * node_; //!< pointer to owner node
 			graphics::Texture * albedo_texture_;
+            graphics::Texture * heightmap_texture_;
 		};
 
     } // namespace terrain
