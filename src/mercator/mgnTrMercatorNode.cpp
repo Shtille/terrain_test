@@ -161,6 +161,13 @@ namespace mgn {
             has_renderable_ = false;
             PropagateLodDistances();
         }
+        void MercatorNode::RefreshRenderable(MercatorMapTile * map_tile)
+        {
+            renderable_.Update(this, map_tile);
+            page_out_ = false;
+            has_renderable_ = true;
+            PropagateLodDistances();
+        }
         bool MercatorNode::WillRender()
         {
             // Being asked to render ourselves.
@@ -227,8 +234,19 @@ namespace mgn {
                 // If the texture is not fine enough...
                 if (!renderable_.IsInMIPRange())
                 {
+                    if (owner_->preprocess_)
+                    {
+                        // We need to do a split at preprocess stage
+                        recurse = true;
+                        // Also make a map tile request just to enqueue tasks
+                        if (!request_albedo_)
+                        {
+                            request_map_tile_ = true;
+                            owner_->Request(this, MercatorTree::REQUEST_MAPTILE);
+                        }
+                    }
                     // If there is already a native res map-tile...
-                    if (has_map_tile_)
+                    else if (has_map_tile_)
                     {
                         // Make sure the renderable is up-to-date.
                         if (renderable_.GetMapTile() == &map_tile_)
@@ -327,6 +345,7 @@ namespace mgn {
             shader->Uniform4fv("u_stuv_scale", renderable_.stuv_scale_);
             shader->Uniform4fv("u_stuv_position", renderable_.stuv_position_);
             shader->Uniform1f("u_skirt_height", renderable_.distance_);
+            //shader->Uniform4fv("u_color", renderable_.color_);
 
             renderable_.GetMapTile()->BindTexture();
 

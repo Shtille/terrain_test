@@ -45,6 +45,7 @@ namespace mgn {
 
             void CreateRenderable(MercatorMapTile * map_tile);
             void DestroyRenderable();
+            void RefreshRenderable(MercatorMapTile * map_tile);
 
             bool WillRender();
             int Render();

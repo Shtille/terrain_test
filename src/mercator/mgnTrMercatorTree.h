@@ -106,7 +106,8 @@ namespace mgn {
             bool HandleMerge(MercatorNode* node);
 
             void PruneTree();
-            void RefreshMapTile(MercatorNode* node, MercatorMapTile* tile);
+            void RefreshMapTile(MercatorNode* node, MercatorMapTile* old_tile, MercatorMapTile* new_tile);
+            void FlushMapTileToRoot(MercatorNode* node);
             void ProcessDoneTasks();
             void PreprocessTree();
 

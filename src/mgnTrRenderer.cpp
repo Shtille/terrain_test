@@ -405,8 +405,10 @@ namespace mgn {
             mRenderer->AddShader(mMercatorTileShader, kMercatorTileVertexShaderSource, kMercatorTileFragmentShaderSource, attribs, 1);
             if (mMercatorTileShader)
             {
+                float height_multiplier = MercatorTree::GetMapSizeMax() / 111111.0f / 360.0f;
                 mMercatorTileShader->Bind();
                 mMercatorTileShader->Uniform1f("u_map_size_max", MercatorTree::GetMapSizeMax());
+                mMercatorTileShader->Uniform1f("u_height_multiplier", height_multiplier);
                 mMercatorTileShader->Uniform1f("u_height_min", GetHeightMin());
                 mMercatorTileShader->Uniform1f("u_height_range", GetHeightRange());
                 mMercatorTileShader->Uniform1i("u_texture", 0);

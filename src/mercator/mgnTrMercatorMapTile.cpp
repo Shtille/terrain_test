@@ -2,6 +2,8 @@
 
 #include "mgnTrMercatorTree.h"
 
+#include "mgnTrConstants.h"
+
 #include "MapDrawing/Graphics/Renderer.h"
 
 namespace mgn {
@@ -11,12 +13,14 @@ namespace mgn {
 		: node_(NULL)
 		, albedo_texture_(NULL)
         , heightmap_texture_(NULL)
+        , height_data_(NULL)
 		{
 		}
         MercatorMapTile::MercatorMapTile(MercatorNode * node)
         : node_(node)
         , albedo_texture_(NULL)
         , heightmap_texture_(NULL)
+        , height_data_(NULL)
         {
         }
 		MercatorMapTile::~MercatorMapTile()
@@ -40,11 +44,20 @@ namespace mgn {
                 renderer->DeleteTexture(heightmap_texture_);
                 heightmap_texture_ = NULL;
             }
+            if (height_data_)
+            {
+                delete[] height_data_;
+                height_data_ = NULL;
+            }
 		}
 		MercatorNode * MercatorMapTile::GetNode()
 		{
 			return node_;
 		}
+        const float * MercatorMapTile::GetHeightData() const
+        {
+            return height_data_;
+        }
 		void MercatorMapTile::BindTexture()
 		{
 			graphics::Renderer * renderer = node_->owner_->renderer_;
@@ -76,7 +89,33 @@ namespace mgn {
             else
             {
                 graphics::Renderer * renderer = node_->owner_->renderer_;
-                renderer->AddTextureFromImage(heightmap_texture_, image, graphics::Texture::Wrap::kClampToEdge);
+                renderer->AddTextureFromImage(heightmap_texture_, image,
+                    graphics::Texture::Wrap::kClampToEdge, graphics::Texture::Filter::kLinear, false);
+            }
+            FillHeightData(image);
+        }
+        void MercatorMapTile::FillHeightData(const graphics::Image& image)
+        {
+            const float kHeightMin = mgn::terrain::GetHeightMin();
+            const float kHeightRange = mgn::terrain::GetHeightRange();
+
+            if (height_data_)
+                delete[] height_data_;
+            height_data_ = new float[image.width() * image.height()];
+
+            for (int j = 0; j < image.height(); ++j)
+            {
+                for (int i = 0; i < image.width(); ++i)
+                {
+                    // Unpack float value from two bytes
+                    int index = j * image.width() + i;
+                    const unsigned char * data = image.pixels() + (index * image.bpp());
+                    unsigned int x = static_cast<unsigned int>(data[0]);
+                    unsigned int y = static_cast<unsigned int>(data[1]);
+                    float norm_height = static_cast<float>(255 * x + y) / 65535.0f;
+                    float height = kHeightMin + kHeightRange * norm_height;
+                    height_data_[index] = height;
+                }
             }
         }
 

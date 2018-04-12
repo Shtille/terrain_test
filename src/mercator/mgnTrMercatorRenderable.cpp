@@ -4,6 +4,8 @@
 #include "mgnTrMercatorNode.h"
 #include "mgnTrMercatorMapTile.h"
 
+#include "mgnTrConstants.h"
+
 #include "MapDrawing/Graphics/mgnCommonMath.h"
 
 #include <cmath>
@@ -18,6 +20,11 @@ namespace {
         if (ppy)
             *ppy = (1.0f - (qpy + 1.0f) * 0.5f) * msm; // to range [0,msm]
     }
+    float MetersToPixelsHeight(float height)
+    {
+        float height_multiplier = mgn::terrain::MercatorTree::GetMapSizeMax() / 111111.0f / 360.0f;
+        return height * height_multiplier;
+    }
 }
 
 namespace mgn {
@@ -28,7 +35,6 @@ namespace mgn {
 		, map_tile_(NULL)
 		, lod_priority_(0.0f)
 		, child_distance_(0.0f)
-		, lod_difference_(0.0f)
 		, distance_(0.0f)
 		, is_in_lod_range_(false)
 		, is_in_mip_range_(false)
@@ -75,7 +81,7 @@ namespace mgn {
             const float planet_radius = node_->owner_->earth_radius_;
 
 			// Bounding box clipping.
-			is_clipped_ = !frustum->IsBoxIn(bounding_box_);
+			is_clipped_ = false; //!frustum->IsBoxIn(bounding_box_); // TODO: fix clipping
 			is_far_away_ = false;
 
 			// Get vector from center to camera and normalize it.
@@ -100,10 +106,10 @@ namespace mgn {
 			// Determine LOD priority.
 			lod_priority_ = -(to_camera & params.camera_front);
 
-			is_in_lod_range_ = GetLodDistance() * params.geo_factor < near_position_distance;
+			is_in_lod_range_ = true; //GetLodDistance() * params.geo_factor < near_position_distance;
 
 			// Calculate texel resolution relative to near grid-point (approx).
-			float cos_angle = to_camera.y; // tile incination angle
+			float cos_angle = to_camera.y; // tile inclination angle
 			float face_size = cos_angle * planet_radius * math::kPi * 2.0f; // Curved width/height of texture cube face on the sphere
 			float cube_side_pixels = static_cast<float>(256 << map_tile_->GetNode()->lod_);
 			float texel_size = face_size / cube_side_pixels; // Size of a single texel in world units
@@ -155,35 +161,62 @@ namespace mgn {
 			const float position_x = -1.f + inv_scale * node_->x_;
 			const float position_y = -1.f + inv_scale * node_->y_;
 
+            // Calculate scales, offset for tile position in map tile.
+            int relative_lod = node_->lod_ - map_tile_->GetNode()->lod_;
+            const int relative_x = (node_->x_ - (map_tile_->GetNode()->x_ << relative_lod));
+            const int relative_y = (node_->y_ - (map_tile_->GetNode()->y_ << relative_lod));
+
+            // Calculate offsets and strides for the tile's height map buffer.
+            const int kHeightmapWidth = mgn::terrain::GetHeightmapWidth();
+            const int kHeightmapHeight = mgn::terrain::GetHeightmapHeight();
+            const int step_x = (kHeightmapWidth  - 1) / (1 << relative_lod) / (grid_size - 1);
+            const int step_y = (kHeightmapHeight - 1) / (1 << relative_lod) / (grid_size - 1);
+            const int pixel_x = relative_x * step_x * (grid_size - 1);
+            const int pixel_y = relative_y * step_y * (grid_size - 1);
+            const int offset_x = step_x;
+            const int offset_y = step_y * kHeightmapWidth;
+
 			// Keep track of extents.
 			math::Vector3 min = math::Vector3(fMapSizeMax), max = math::Vector3(-fMapSizeMax);
 			center_.Set(0.0f, 0.0f, 0.0f);
 
-			// Lossy representation of heightmap
-			//const int offsetX2 = offsetX * 2;
-		 //   const int offsetY2 = offsetY * 2;
-		 //   float diff = 0;
-		 //   for (int j = 0; j < (grid_size - 1); j += 2) {
-		 //       HeightMapPixel* pMapRow = &pMap[(pixelY + j * stepY) * mMap->getWidth() + pixelX];
-		 //       for (int i = 0; i < (grid_size - 1); i += 2) {
-		 //           // dx
-		 //           diff = maxf(diff, fabs((getOffsetPixel(0) + getOffsetPixel(offsetX2)) / 2.0f - getOffsetPixel(offsetX)));
-		 //           diff = maxf(diff, fabs((getOffsetPixel(offsetY2) + getOffsetPixel(offsetY2 + offsetX2)) / 2.0f - getOffsetPixel(offsetY + offsetX)));
-		 //           // dy
-		 //           diff = maxf(diff, fabs((getOffsetPixel(0) + getOffsetPixel(offsetY2)) / 2.0f - getOffsetPixel(offsetY)));
-		 //           diff = maxf(diff, fabs((getOffsetPixel(offsetX2) + getOffsetPixel(offsetX2 + offsetY2)) / 2.0f - getOffsetPixel(offsetX + offsetY)));
-		 //           // diag
-		 //           diff = maxf(diff, fabs((getOffsetPixel(offsetX2) + getOffsetPixel(offsetY2)) / 2.0f - getOffsetPixel(offsetY + offsetX)));
-		 //           
-		 //           pMapRow += offsetX2;
-		 //       }
-		 //   }
-		    lod_difference_ = 0.0f;//diff / PlanetMapBuffer::LEVEL_RANGE;
-		    distance_ = 0.0f;//lod_difference_ * mPlanetHeight;
+            const float * height_data = map_tile_->GetHeightData();
+
+            if (height_data != NULL)
+            {
+			    // Lossy representation of height map
+			    const int offset_x2 = offset_x * 2;
+		        const int offset_y2 = offset_y * 2;
+		        float diff = 0.0f;
+                #define GET_DATA(x) (*(row + x))
+		        for (int j = 0; j < (grid_size - 1); j += 2)
+                {
+		            const float* row = &height_data[(pixel_y + j * step_y) * kHeightmapWidth + pixel_x];
+		            for (int i = 0; i < (grid_size - 1); i += 2)
+                    {
+		                // X direction
+                        diff = std::max(diff, fabs((GET_DATA(0) + GET_DATA(offset_x2)) / 2.0f - GET_DATA(offset_x)));
+		                diff = std::max(diff, fabs((GET_DATA(offset_y2) + GET_DATA(offset_y2 + offset_x2)) / 2.0f - GET_DATA(offset_y + offset_x)));
+		                // Y direction
+		                diff = std::max(diff, fabs((GET_DATA(0) + GET_DATA(offset_y2)) / 2.0f - GET_DATA(offset_y)));
+		                diff = std::max(diff, fabs((GET_DATA(offset_x2) + GET_DATA(offset_x2 + offset_y2)) / 2.0f - GET_DATA(offset_x + offset_y)));
+		                // Diagonal
+		                diff = std::max(diff, fabs((GET_DATA(offset_x2) + GET_DATA(offset_y2)) / 2.0f - GET_DATA(offset_y + offset_x)));
+    		            
+		                row += offset_x2;
+		            }
+		        }
+                #undef GET_DATA
+		        distance_ = diff;
+            }
+            else
+                distance_ = 0.0f;
 
 			// Process vertex data for regular grid.
+            const float* corner = height_data + (pixel_y * kHeightmapWidth + pixel_x);
 			for (int j = 0; j < grid_size; ++j)
 			{
+                const float* row = corner + j * offset_y;
 				for (int i = 0; i < grid_size; ++i)
 				{
 					float x = (float)i / (float)(grid_size - 1);
@@ -193,12 +226,17 @@ namespace mgn {
                     math::Vector3 vertex;
                     QuadPointToPixelPoint(fMapSizeMax, quad_point.x, quad_point.y,
                         &vertex.x, &vertex.z);
-                    vertex.y = 0.0f; // height
+                    if (height_data != NULL)
+                        vertex.y = MetersToPixelsHeight(*row); // height
+                    else
+                        vertex.y = 0.0f;
 
 					center_ += vertex;
 
 					min.MakeFloor(vertex);
 					max.MakeCeil(vertex);
+
+                    row += offset_x;
 				}
 			}
 

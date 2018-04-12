@@ -19,6 +19,14 @@ namespace mgn {
         {
             return 10000.0f;
         }
+        const int GetHeightmapWidth()
+        {
+            return 65;
+        }
+        const int GetHeightmapHeight()
+        {
+            return 65;
+        }
 
     } // namespace terrain
 } // namespace mgn

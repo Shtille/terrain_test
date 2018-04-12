@@ -47,7 +47,6 @@ namespace mgn {
 
 			float lod_priority_; //!< priority for nodes queue processing
 			float child_distance_;
-			float lod_difference_;
 
 			// Additional params to map to shader
 			float distance_;

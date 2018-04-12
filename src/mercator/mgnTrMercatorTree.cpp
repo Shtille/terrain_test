@@ -95,9 +95,12 @@ namespace mgn {
             // Preprocess tree for the first time
             if (preprocess_)
             {
-                //PreprocessTree();
+                PreprocessTree();
                 preprocess_ = false;
             }
+
+            // Handle delayed requests (for rendering new tiles).
+            HandleRenderRequests();
 
             if (!tree_freeze_)
             {
@@ -107,9 +110,6 @@ namespace mgn {
                 // Update LOD requests.
                 HandleInlineRequests();
             }
-
-            // Handle delayed requests (for rendering new tiles).
-            HandleRenderRequests();
         }
         void MercatorTree::Render()
         {
@@ -253,7 +253,8 @@ namespace mgn {
         void MercatorTree::HandleRenderRequests()
         {
             // Process task that have been done on a service thread
-            ProcessDoneTasks();
+            if (!preprocess_)
+                ProcessDoneTasks();
 
             // Then handle requests
             HandleRequests(render_requests_);
@@ -272,21 +273,28 @@ namespace mgn {
                 maxLOD++;
             }
 
-            // See if we can find a map tile to derive from.
-            MercatorNode * ancestor = node;
-            while (!ancestor->has_map_tile_ && ancestor->parent_) { ancestor = ancestor->parent_; };
-
-            // See if map tile found is in acceptable LOD range (ie. grid size <= texturesize).
-            if (ancestor->has_map_tile_)
+            if (preprocess_)
             {
-                int relativeLOD = node->lod_ - ancestor->lod_;
-                if (relativeLOD <= maxLOD)
+                // We need renderable to be created at preprocess stage for further split
+                node->RefreshRenderable(&node->map_tile_);
+                node->request_renderable_ = false;
+            }
+            else
+            {
+                // See if we can find a map tile to derive from.
+                MercatorNode * ancestor = node;
+                while (!ancestor->has_map_tile_ && ancestor->parent_) { ancestor = ancestor->parent_; };
+
+                // See if map tile found is in acceptable LOD range (ie. grid size <= texturesize).
+                if (ancestor->has_map_tile_)
                 {
-                    // Replace existing renderable.
-                    node->DestroyRenderable();
-                    // Create renderable relative to the map tile.
-                    node->CreateRenderable(&ancestor->map_tile_);
-                    node->request_renderable_ = false;
+                    int relativeLOD = node->lod_ - ancestor->lod_;
+                    if (relativeLOD <= maxLOD)
+                    {
+                        // Replace existing renderable.
+                        node->RefreshRenderable(&ancestor->map_tile_);
+                        node->request_renderable_ = false;
+                    }
                 }
             }
 
@@ -297,12 +305,12 @@ namespace mgn {
                 node->request_map_tile_ = true;
                 Request(node, REQUEST_MAPTILE, true);
             }
+            node->request_renderable_ = false;
             return true;
         }
         bool MercatorTree::HandleMapTile(MercatorNode* node)
         {
             // Assemble a map tile object for this node.
-            //node->CreateMapTile();
             node->request_map_tile_ = false;
 
             bool has_albedo = node->map_tile_.HasAlbedoTexture();
@@ -313,16 +321,21 @@ namespace mgn {
                 node->request_albedo_ = true;
                 service_->AddTask(new TextureTask(node, provider_));
             }
-            if (!has_heightmap && !node->request_heightmap_)
+            //if (!has_heightmap && !node->request_heightmap_)
+            //{
+            //    node->request_heightmap_ = true;
+            //    service_->AddTask(new HeightmapTask(node, provider_));
+            //}
+            if (preprocess_)
             {
-                node->request_heightmap_ = true;
-                service_->AddTask(new HeightmapTask(node, provider_));
+                // At preprocess stage we just need to enqueue tasks
+                return false;
             }
-            bool tile_filled = has_albedo && has_heightmap;
+            bool tile_filled = has_albedo /*&& has_heightmap*/;
             if (tile_filled)
             {
                 // Map tile is complete and can be used as ancestor
-                node->has_map_tile_ = true;
+                node->CreateMapTile();
 
                 // Request a new renderable to match.
                 node->request_renderable_ = true;
@@ -332,7 +345,7 @@ namespace mgn {
                 if (node->has_renderable_)
                 {
                     MercatorMapTile * old_tile = node->renderable_.GetMapTile();
-                    RefreshMapTile(node, old_tile);
+                    RefreshMapTile(node, old_tile, &node->map_tile_);
                 }
 
                 return true;
@@ -400,18 +413,32 @@ namespace mgn {
                 }
             }
         }
-        void MercatorTree::RefreshMapTile(MercatorNode* node, MercatorMapTile* tile)
+        void MercatorTree::RefreshMapTile(MercatorNode* node, MercatorMapTile* old_tile, MercatorMapTile* new_tile)
         {
             for (int i = 0; i < 4; ++i)
             {
                 MercatorNode* child = node->children_[i];
-                if (child && child->has_renderable_ && child->renderable_.GetMapTile() == tile)
+                if (child && child->has_renderable_ && child->renderable_.GetMapTile() == old_tile)
                 {
-                    child->request_renderable_ = true;
-                    Request(child, REQUEST_RENDERABLE, true);
+                    // Refresh renderable relative to the map tile.
+                    child->RefreshRenderable(new_tile);
 
                     // Recurse
-                    RefreshMapTile(child, tile);
+                    RefreshMapTile(child, old_tile, new_tile);
+                }
+            }
+        }
+        void MercatorTree::FlushMapTileToRoot(MercatorNode* node)
+        {
+            for (int i = 0; i < 4; ++i)
+            {
+                MercatorNode* child = node->children_[i];
+                if (child && child->has_renderable_)
+                {
+                    // Flush map tile to root one
+                    child->RefreshRenderable(&root_->map_tile_);
+                    // Recurse
+                    FlushMapTileToRoot(child);
                 }
             }
         }
@@ -441,6 +468,9 @@ namespace mgn {
                     root_->Render();
             }
             while (!render_requests_.empty() || !inline_requests_.empty());
+
+            // After preprocess we should flush map tiles to root level
+            FlushMapTileToRoot(root_);
         }
         const int MercatorTree::grid_size() const
         {

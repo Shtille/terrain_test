@@ -26,6 +26,7 @@ namespace mgn {
 			void Destroy();
 
 			MercatorNode * GetNode();
+            const float * GetHeightData() const;
 			void BindTexture();
 
             bool HasAlbedoTexture() const;
@@ -35,9 +36,12 @@ namespace mgn {
             void SetHeightmapImage(const graphics::Image& image);
 
 		private:
+            void FillHeightData(const graphics::Image& image);
+
 			MercatorNode * node_; //!< pointer to owner node
 			graphics::Texture * albedo_texture_;
             graphics::Texture * heightmap_texture_;
+            float * height_data_;
 		};
 
     } // namespace terrain
