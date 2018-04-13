@@ -61,8 +61,16 @@ namespace mgn {
 		void MercatorMapTile::BindTexture()
 		{
 			graphics::Renderer * renderer = node_->owner_->renderer_;
-			renderer->ChangeTexture(albedo_texture_, 0U);
-            renderer->ChangeTexture(heightmap_texture_, 1U);
+            // Set albedo texture
+            if (albedo_texture_)
+			    renderer->ChangeTexture(albedo_texture_, 0U);
+            else
+                renderer->ChangeTexture(node_->owner_->default_albedo_texture_, 0U);
+            // Set height texture
+            if (heightmap_texture_)
+                renderer->ChangeTexture(heightmap_texture_, 1U);
+            else
+                renderer->ChangeTexture(node_->owner_->default_heightmap_texture_, 1U);
 		}
         bool MercatorMapTile::HasAlbedoTexture() const
         {

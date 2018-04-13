@@ -58,15 +58,38 @@ namespace mgn {
             delete root_;
 
             delete tile_;
+            if (default_albedo_texture_)
+            {
+                renderer_->DeleteTexture(default_albedo_texture_);
+                default_albedo_texture_ = NULL;
+            }
+            if (default_heightmap_texture_)
+            {
+                renderer_->DeleteTexture(default_heightmap_texture_);
+                default_heightmap_texture_ = NULL;
+            }
 
             service_->StopService();
             delete service_; // should be deleted after faces are done
         }
         bool MercatorTree::Initialize()
         {
+            // Create tile mesh
             tile_->Create();
             if (!tile_->MakeRenderable())
                 return false;
+            // Create default textures
+            const int kAlbedoData = (0xff << 24) | (0xff << 16) | (0xff << 8) | 0xff;
+            renderer_->CreateTextureFromData(default_albedo_texture_, 1, 1,
+                graphics::Image::Format::kRGBA32, graphics::Texture::Filter::kLinear,
+                (unsigned char*)&kAlbedoData);
+            if (!default_albedo_texture_) return false;
+            const int kHeightData = (0xff << 24);
+            renderer_->CreateTextureFromData(default_heightmap_texture_, 1, 1,
+                graphics::Image::Format::kRGBA32, graphics::Texture::Filter::kLinear,
+                (unsigned char*)&kHeightData);
+            if (!default_heightmap_texture_) return false;
+            // Run service
             service_->RunService();
             return true;
         }
@@ -321,17 +344,17 @@ namespace mgn {
                 node->request_albedo_ = true;
                 service_->AddTask(new TextureTask(node, provider_));
             }
-            //if (!has_heightmap && !node->request_heightmap_)
-            //{
-            //    node->request_heightmap_ = true;
-            //    service_->AddTask(new HeightmapTask(node, provider_));
-            //}
+            if (!has_heightmap && !node->request_heightmap_)
+            {
+                node->request_heightmap_ = true;
+                service_->AddTask(new HeightmapTask(node, provider_));
+            }
             if (preprocess_)
             {
                 // At preprocess stage we just need to enqueue tasks
                 return false;
             }
-            bool tile_filled = has_albedo /*&& has_heightmap*/;
+            bool tile_filled = has_albedo && has_heightmap;
             if (tile_filled)
             {
                 // Map tile is complete and can be used as ancestor
@@ -471,6 +494,9 @@ namespace mgn {
 
             // After preprocess we should flush map tiles to root level
             FlushMapTileToRoot(root_);
+
+            // And sort tasks queue in service
+            service_->SortTasks();
         }
         const int MercatorTree::grid_size() const
         {
@@ -495,6 +521,16 @@ namespace mgn {
         bool MercatorTree::RequestComparePriority::operator()(const RequestType& a, const RequestType& b) const
         {
             return (a.node->GetPriority() > b.node->GetPriority());
+        }
+        bool TaskNodeCompareFunctor::operator()(Task * task1, Task * task2) const
+        {
+            // Textures have first priority for fetch
+            if (task1->type() != task2->type())
+                return task1->type() < task2->type(); // texture over other requests
+            else if (task1->node()->lod() != task2->node()->lod())
+                return task1->node()->lod() < task2->node()->lod(); // lower LOD priority
+            else
+                return task1->node()->GetPriority() > task2->node()->GetPriority();
         }
 
     } // namespace terrain

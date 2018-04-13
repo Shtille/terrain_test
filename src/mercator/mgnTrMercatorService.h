@@ -27,6 +27,7 @@ namespace mgn {
             void AddTask(Task * task);
             bool GetDoneTasks(TaskList& task_list);
             bool RemoveAllNodeTasks(MercatorNode * node);
+            void SortTasks();
 
 		private:
 			MercatorService(MercatorService&);

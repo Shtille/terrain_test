@@ -355,6 +355,16 @@ namespace mgn {
         {
             request_albedo_ = false;
             map_tile_.SetAlbedoImage(image);
+
+            // Remember old map tile before update
+            MercatorMapTile * old_tile = renderable_.GetMapTile();
+
+            // Refresh renderable relative to the map tile.
+            RefreshRenderable(&map_tile_);
+            request_renderable_ = false;
+
+            // See if any child renderables use the old map tile.
+            owner_->RefreshMapTile(this, old_tile, &map_tile_);
         }
         void MercatorNode::OnHeightmapTaskCompleted(const graphics::Image& image)
         {

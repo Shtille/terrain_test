@@ -20,6 +20,7 @@ namespace mgn {
             virtual ~Task();
 
             MercatorNode * node() const;
+            int type() const;
 
             virtual void Execute() = 0; //!< target task, done on service thread
             virtual void Process() = 0; //!< data processing after task is completed, done on main thread
@@ -37,6 +38,12 @@ namespace mgn {
 
         private:
             MercatorNode * node_;
+        };
+
+        //! Functor for node matching
+        class TaskNodeCompareFunctor {
+        public:
+            bool operator()(Task * task1, Task * task2) const;
         };
 
     } // namespace terrain

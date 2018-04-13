@@ -89,6 +89,11 @@ namespace mgn {
         	done_tasks_.remove_if(task_match_functor);
         	return true;
         }
+        void MercatorService::SortTasks()
+        {
+            boost::unique_lock<boost::mutex> guard(mutex_);
+            tasks_.sort(TaskNodeCompareFunctor());
+        }
 		void MercatorService::ThreadFunc()
 		{
 			Task * task = NULL;

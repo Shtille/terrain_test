@@ -127,6 +127,9 @@ namespace mgn {
             MercatorTileMesh * tile_;
             MercatorService * service_;         //!< service for filling data
 
+            graphics::Texture * default_albedo_texture_;
+            graphics::Texture * default_heightmap_texture_;
+
             RequestQueue inline_requests_;
             RequestQueue render_requests_;
             NodeSet open_nodes_;

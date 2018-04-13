@@ -15,6 +15,10 @@ namespace mgn {
         {
             return node_;
         }
+        int Task::type() const
+        {
+            return type_;
+        }
         TaskNodeMatchFunctor::TaskNodeMatchFunctor(MercatorNode * node)
         : node_(node)
         {
