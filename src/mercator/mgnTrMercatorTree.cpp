@@ -1,5 +1,7 @@
 #include "mgnTrMercatorTree.h"
 
+#include "mgnTrConstants.h"
+
 #include "mgnTrMercatorNode.h"
 #include "mgnTrMercatorTileMesh.h"
 #include "mgnTrMercatorRenderable.h"
@@ -79,16 +81,28 @@ namespace mgn {
             if (!tile_->MakeRenderable())
                 return false;
             // Create default textures
-            const int kAlbedoData = (0xff << 24) | (0xff << 16) | (0xff << 8) | 0xff;
-            renderer_->CreateTextureFromData(default_albedo_texture_, 1, 1,
-                graphics::Image::Format::kRGBA32, graphics::Texture::Filter::kLinear,
-                (unsigned char*)&kAlbedoData);
-            if (!default_albedo_texture_) return false;
-            const int kHeightData = (0xff << 24);
-            renderer_->CreateTextureFromData(default_heightmap_texture_, 1, 1,
-                graphics::Image::Format::kRGBA32, graphics::Texture::Filter::kLinear,
-                (unsigned char*)&kHeightData);
-            if (!default_heightmap_texture_) return false;
+            {
+                const int kAlbedoData = (0xff << 16) | (0xff << 8) | 0xff;
+                renderer_->CreateTextureFromData(default_albedo_texture_, 1, 1,
+                    graphics::Image::Format::kRGB8, graphics::Texture::Filter::kPoint,
+                    (unsigned char*)&kAlbedoData);
+                if (!default_albedo_texture_) return false;
+            }
+            {
+                const float kHeightMin = mgn::terrain::GetHeightMin();
+                const float kHeightRange = mgn::terrain::GetHeightRange();
+                const float kDefaultHeight = 0.0f;
+                // Pack float value into two bytes, order should be opposite to one in shader
+                float norm_height = (kDefaultHeight - kHeightMin) / kHeightRange;
+                unsigned short short_height = static_cast<unsigned short>(norm_height * 65535.0f);
+                unsigned char r = static_cast<unsigned char>(short_height / 256);
+                unsigned char g = static_cast<unsigned char>(short_height % 256);
+                const int kHeightData = (g << 8) | r;
+                renderer_->CreateTextureFromData(default_heightmap_texture_, 1, 1,
+                    graphics::Image::Format::kRGB8, graphics::Texture::Filter::kPoint,
+                    (unsigned char*)&kHeightData);
+                if (!default_heightmap_texture_) return false;
+            }
             // Run service
             service_->RunService();
             return true;
@@ -361,8 +375,8 @@ namespace mgn {
                 node->CreateMapTile();
 
                 // Request a new renderable to match.
-                node->request_renderable_ = true;
-                Request(node, REQUEST_RENDERABLE, true);
+                node->RefreshRenderable(&node->map_tile_);
+                node->request_renderable_ = false;
 
                 // See if any child renderables use the old map tile.
                 if (node->has_renderable_)
