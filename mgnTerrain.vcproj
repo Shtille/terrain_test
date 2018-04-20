@@ -616,6 +616,22 @@
 					>
 				</File>
 				<File
+					RelativePath=".\src\mercator\mgnTrMercatorNodeKey.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\src\mercator\mgnTrMercatorNodeKey.h"
+					>
+				</File>
+				<File
+					RelativePath=".\src\mercator\mgnTrMercatorNodePool.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\src\mercator\mgnTrMercatorNodePool.h"
+					>
+				</File>
+				<File
 					RelativePath=".\src\mercator\mgnTrMercatorRenderable.cpp"
 					>
 				</File>

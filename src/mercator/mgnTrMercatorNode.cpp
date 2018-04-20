@@ -1,5 +1,6 @@
 #include "mgnTrMercatorNode.h"
 
+#include "mgnTrMercatorNodePool.h"
 #include "mgnTrMercatorTileMesh.h"
 #include "mgnTrMercatorTree.h"
 #include "mgnTrMercatorMapTile.h"
@@ -45,7 +46,7 @@ namespace mgn {
             DestroyMapTile();
             DestroyRenderable();
             for (int i = 0; i < 4; ++i)
-                DetachChild(i);
+                DetachChild(i, false);
         }
         int MercatorNode::lod() const
         {
@@ -73,18 +74,38 @@ namespace mgn {
         {
             return children_[0] || children_[1] || children_[2] || children_[3];
         }
-        void MercatorNode::AttachChild(MercatorNode * child, int position)
+        void MercatorNode::AttachChild(int position)
         {
             if (children_[position])
                 throw "Attaching child where one already exists.";
+
+            MercatorNodeKey key(
+                lod_ + 1,
+                x_ * 2 + (position % 2),
+                y_ * 2 + (position / 2));
+
+            MercatorNode * child = NULL;
+            if (owner_->IsUsingPool())
+            {
+                // Get node from pool
+                child = owner_->node_pool_->Pull(key);
+                if (!child) // hasn't been allocated yet
+                    child = new MercatorNode(owner_);
+                // Some loading stuff
+                child->OnAttach();
+            }
+            else
+            {
+                child = new MercatorNode(owner_);
+            }
 
             children_[position] = child;
             child->parent_ = this;
             child->parent_slot_ = position;
 
-            child->lod_ = lod_ + 1;
-            child->x_ = x_ * 2 + (position % 2);
-            child->y_ = y_ * 2 + (position / 2);
+            child->lod_ = key.lod;
+            child->x_ = key.x;
+            child->y_ = key.y;
 
             has_children_ = true;
 
@@ -92,11 +113,21 @@ namespace mgn {
             ++owner_->debug_info_.num_nodes;
 #endif
         }
-        void MercatorNode::DetachChild(int position)
+        void MercatorNode::DetachChild(int position, bool use_pool)
         {
-            if (children_[position])
+            MercatorNode * child = children_[position];
+            if (child)
             {
-                delete children_[position];
+                if (use_pool)
+                {
+                    owner_->node_pool_->Push(child);
+                    // Some unloading stuff
+                    child->OnDetach();
+                }
+                else
+                {
+                    delete child;
+                }
                 children_[position] = NULL;
 
                 has_children_ = children_[0] || children_[1] || children_[2] || children_[3];
@@ -234,16 +265,21 @@ namespace mgn {
                 // If the texture is not fine enough...
                 if (!renderable_.IsInMIPRange())
                 {
+                    const int kStartLod = 5;
                     if (owner_->preprocess_)
                     {
                         // We need to do a split at preprocess stage
                         recurse = true;
                         // Also make a map tile request just to enqueue tasks
-                        if (!request_albedo_)
+                        if (!request_albedo_ && lod_ >= kStartLod)
                         {
                             request_map_tile_ = true;
                             owner_->Request(this, MercatorTree::REQUEST_MAPTILE);
                         }
+                    }
+                    else if (lod_ < kStartLod)
+                    {
+                        recurse = true;
                     }
                     // If there is already a native res map-tile...
                     else if (has_map_tile_)
@@ -370,6 +406,24 @@ namespace mgn {
         {
             request_heightmap_ = false;
             map_tile_.SetHeightmapImage(image);
+        }
+        void MercatorNode::OnAttach()
+        {
+            // Load data on attach
+            LoadData();
+        }
+        void MercatorNode::OnDetach()
+        {
+            // Unload data on detach
+            UnloadData();
+        }
+        void MercatorNode::LoadData()
+        {
+            //
+        }
+        void MercatorNode::UnloadData()
+        {
+            //
         }
 
     } // namespace terrain

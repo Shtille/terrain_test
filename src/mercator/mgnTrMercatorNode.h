@@ -35,8 +35,8 @@ namespace mgn {
 
             bool IsSplit();
 
-            void AttachChild(MercatorNode * child, int position);
-            void DetachChild(int position);
+            void AttachChild(int position);
+            void DetachChild(int position, bool use_pool);
 
             void PropagateLodDistances();
 
@@ -54,6 +54,14 @@ namespace mgn {
             // Task functions
             void OnTextureTaskCompleted(const graphics::Image& image);
             void OnHeightmapTaskCompleted(const graphics::Image& image);
+
+        protected:
+            // Node data functions
+            void OnAttach();
+            void OnDetach();
+
+            void LoadData();
+            void UnloadData();
 
         private:
             MercatorTree * owner_; //!< owner tree

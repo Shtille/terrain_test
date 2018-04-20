@@ -3,6 +3,7 @@
 #include "mgnTrConstants.h"
 
 #include "mgnTrMercatorNode.h"
+#include "mgnTrMercatorNodePool.h"
 #include "mgnTrMercatorTileMesh.h"
 #include "mgnTrMercatorRenderable.h"
 #include "mgnTrMercatorService.h"
@@ -40,7 +41,9 @@ namespace mgn {
         , tree_freeze_(false)
         {
             root_ = new MercatorNode(this);
-            //tiles_pool_ = new MercatorNode*[tile_capacity];
+
+            const int kPoolSize = 50;
+            node_pool_ = new MercatorNodePool(kPoolSize);
 
             tile_ = new MercatorTileMesh(renderer, grid_size_);
             service_ = new MercatorService();
@@ -56,10 +59,15 @@ namespace mgn {
         }
         MercatorTree::~MercatorTree()
         {
-            //delete[] tiles_pool_;
             delete root_;
+            root_ = NULL;
+
+            delete node_pool_;
+            node_pool_ = NULL;
 
             delete tile_;
+            tile_ = NULL;
+
             if (default_albedo_texture_)
             {
                 renderer_->DeleteTexture(default_albedo_texture_);
@@ -73,6 +81,7 @@ namespace mgn {
 
             service_->StopService();
             delete service_; // should be deleted after faces are done
+            service_ = NULL;
         }
         bool MercatorTree::Initialize()
         {
@@ -167,8 +176,7 @@ namespace mgn {
             // Create children.
             for (int i = 0; i < 4; ++i)
             {
-                MercatorNode* child = new MercatorNode(node->owner_);
-                node->AttachChild(child, i);
+                node->AttachChild(i);
             }
 #ifdef DEBUG
             if (debug_info_.maximum_achieved_lod < node->lod_ + 1)
@@ -188,7 +196,7 @@ namespace mgn {
                     printf("Lickety split. Faulty merge.\n");
                     assert(false);
                 }
-                node->DetachChild(i);
+                node->DetachChild(i, IsUsingPool());
             }
             // This node is now closed.
             open_nodes_.erase(node);
@@ -368,7 +376,7 @@ namespace mgn {
                 // At preprocess stage we just need to enqueue tasks
                 return false;
             }
-            bool tile_filled = has_albedo && has_heightmap;
+            bool tile_filled = has_albedo /*&& has_heightmap*/;
             if (tile_filled)
             {
                 // Map tile is complete and can be used as ancestor
@@ -531,6 +539,10 @@ namespace mgn {
         const int MercatorTree::GetTextureSize()
         {
             return 257;
+        }
+        const bool MercatorTree::IsUsingPool()
+        {
+            return true;
         }
         bool MercatorTree::RequestComparePriority::operator()(const RequestType& a, const RequestType& b) const
         {

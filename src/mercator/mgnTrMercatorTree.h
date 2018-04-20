@@ -21,6 +21,7 @@ namespace mgn {
         class MercatorMapTile;
         class MercatorService;
         class MercatorProvider;
+        class MercatorNodePool;
 
 #ifdef DEBUG
         struct MercatorDebugInfo {
@@ -88,6 +89,7 @@ namespace mgn {
             static const int GetLodLimit();
             static const float GetMapSizeMax();
             static const int GetTextureSize();
+            static const bool IsUsingPool();
 
             int GetFrameCounter() const;
 
@@ -119,9 +121,7 @@ namespace mgn {
             MercatorProvider * provider_;       //!< pointer to provider object
 
             MercatorNode * root_;
-            unsigned int tile_capacity_;
-            unsigned int num_tiles_;
-            MercatorNode ** tiles_pool_;
+            MercatorNodePool * node_pool_;
 
             const int grid_size_;
             MercatorTileMesh * tile_;
