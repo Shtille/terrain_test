@@ -1,6 +1,6 @@
 #pragma once
-#ifndef __MGN_TERRAIN_MERCATOR_TASK_HEIGHTMAP_H__
-#define __MGN_TERRAIN_MERCATOR_TASK_HEIGHTMAP_H__
+#ifndef __MGN_TERRAIN_MERCATOR_TASK_LABELS_H__
+#define __MGN_TERRAIN_MERCATOR_TASK_LABELS_H__
 
 #include "mgnTrMercatorTask.h"
 
@@ -11,11 +11,11 @@ namespace mgn {
 
         class MercatorProvider;
 
-        //! Heightmap task class
-        class HeightmapTask : public Task {
+        //! Labels task class
+        class LabelsTask : public Task {
         public:
-            HeightmapTask(MercatorNode * node, MercatorProvider * provider);
-            ~HeightmapTask();
+            LabelsTask(MercatorNode * node, MercatorProvider * provider);
+            ~LabelsTask();
 
             void Execute(); /* override */
             void Process(); /* override */
@@ -23,7 +23,6 @@ namespace mgn {
         private:
             MercatorProvider * provider_;
             graphics::Image image_;
-            bool has_errors_;
         };
 
     } // namespace terrain

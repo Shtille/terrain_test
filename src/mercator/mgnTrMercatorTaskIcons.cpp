@@ -1,4 +1,4 @@
-#include "mgnTrMercatorTaskTexture.h"
+#include "mgnTrMercatorTaskIcons.h"
 
 #include "mgnTrMercatorNode.h"
 #include "mgnTrMercatorProvider.h"
@@ -6,16 +6,15 @@
 namespace mgn {
     namespace terrain {
 
-        TextureTask::TextureTask(MercatorNode * node, MercatorProvider * provider)
-        : Task(node, REQUEST_TEXTURE)
+        IconsTask::IconsTask(MercatorNode * node, MercatorProvider * provider)
+        : Task(node, REQUEST_ICONS)
         , provider_(provider)
-        , has_errors_(false)
         {
         }
-        TextureTask::~TextureTask()
+        IconsTask::~IconsTask()
         {
         }
-        void TextureTask::Execute()
+        void IconsTask::Execute()
         {
             MercatorProvider::TextureInfo texture_info;
             texture_info.key_x = node_->x();
@@ -25,12 +24,10 @@ namespace mgn {
             texture_info.errors_occured = false;
 
             provider_->GetTexture(texture_info);
-
-            has_errors_ = texture_info.errors_occured;
         }
-        void TextureTask::Process()
+        void IconsTask::Process()
         {
-            node_->OnTextureTaskCompleted(image_, has_errors_);
+            node_->OnTextureTaskCompleted(image_, false);
         }
 
     } // namespace terrain

@@ -664,6 +664,22 @@
 					>
 				</File>
 				<File
+					RelativePath=".\src\mercator\mgnTrMercatorTaskIcons.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\src\mercator\mgnTrMercatorTaskIcons.h"
+					>
+				</File>
+				<File
+					RelativePath=".\src\mercator\mgnTrMercatorTaskLabels.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\src\mercator\mgnTrMercatorTaskLabels.h"
+					>
+				</File>
+				<File
 					RelativePath=".\src\mercator\mgnTrMercatorTaskTexture.cpp"
 					>
 				</File>

@@ -52,8 +52,8 @@ namespace mgn {
             void RenderSelf();
 
             // Task functions
-            void OnTextureTaskCompleted(const graphics::Image& image);
-            void OnHeightmapTaskCompleted(const graphics::Image& image);
+            void OnTextureTaskCompleted(const graphics::Image& image, bool has_errors);
+            void OnHeightmapTaskCompleted(const graphics::Image& image, bool has_errors);
 
         protected:
             // Node data functions
@@ -87,8 +87,15 @@ namespace mgn {
             bool request_split_;
             bool request_merge_;
 
+            // Node data requests
             bool request_albedo_;
             bool request_heightmap_;
+            bool request_labels_;
+            bool request_icons_;
+
+            // Node data load flags
+            bool has_labels_;
+            bool has_icons_;
 
             int parent_slot_;
             MercatorNode * parent_;

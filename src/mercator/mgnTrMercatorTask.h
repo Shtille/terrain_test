@@ -7,7 +7,9 @@ namespace mgn {
 
         enum MercatorRequestType {
             REQUEST_TEXTURE,
-            REQUEST_HEIGHTMAP
+            REQUEST_HEIGHTMAP,
+            REQUEST_LABELS,
+            REQUEST_ICONS
         };
 
         // Forward declarations

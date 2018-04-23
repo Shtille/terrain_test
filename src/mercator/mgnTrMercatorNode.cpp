@@ -31,6 +31,10 @@ namespace mgn {
         , request_merge_(false)
         , request_albedo_(false)
         , request_heightmap_(false)
+        , request_labels_(false)
+        , request_icons_(false)
+        , has_labels_(false)
+        , has_icons_(false)
         , parent_slot_(-1)
         , parent_(NULL)
         {
@@ -387,7 +391,7 @@ namespace mgn {
 
             owner_->tile_->Render();
         }
-        void MercatorNode::OnTextureTaskCompleted(const graphics::Image& image)
+        void MercatorNode::OnTextureTaskCompleted(const graphics::Image& image, bool has_errors)
         {
             request_albedo_ = false;
             map_tile_.SetAlbedoImage(image);
@@ -401,25 +405,37 @@ namespace mgn {
 
             // See if any child renderables use the old map tile.
             owner_->RefreshMapTile(this, old_tile, &map_tile_);
+
+            if (has_errors) // repeat request
+                owner_->RequestTexture(this);
         }
-        void MercatorNode::OnHeightmapTaskCompleted(const graphics::Image& image)
+        void MercatorNode::OnHeightmapTaskCompleted(const graphics::Image& image, bool has_errors)
         {
             request_heightmap_ = false;
             map_tile_.SetHeightmapImage(image);
+
+            if (has_errors)
+                owner_->RequestHeightmap(this);
         }
         void MercatorNode::OnAttach()
         {
             // Load data on attach
-            LoadData();
+            //LoadData();
         }
         void MercatorNode::OnDetach()
         {
             // Unload data on detach
-            UnloadData();
+            //UnloadData();
         }
         void MercatorNode::LoadData()
         {
-            //
+            // Request labels load
+            if (!has_labels_)
+                owner_->RequestLabels(this);
+
+            // Request icons load
+            if (!has_icons_)
+                owner_->RequestIcons(this);
         }
         void MercatorNode::UnloadData()
         {

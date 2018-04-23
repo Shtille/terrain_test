@@ -113,6 +113,11 @@ namespace mgn {
             void ProcessDoneTasks();
             void PreprocessTree();
 
+            void RequestTexture(MercatorNode* node);
+            void RequestHeightmap(MercatorNode* node);
+            void RequestLabels(MercatorNode* node);
+            void RequestIcons(MercatorNode* node);
+
         private:
             graphics::Renderer * renderer_;     //!< pointer to renderer object
             graphics::Shader * shader_;         //!< pointer to shader object

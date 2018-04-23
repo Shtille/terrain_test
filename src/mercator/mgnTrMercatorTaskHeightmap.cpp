@@ -9,6 +9,7 @@ namespace mgn {
         HeightmapTask::HeightmapTask(MercatorNode * node, MercatorProvider * provider)
         : Task(node, REQUEST_HEIGHTMAP)
         , provider_(provider)
+        , has_errors_(false)
         {
         }
         HeightmapTask::~HeightmapTask()
@@ -24,10 +25,12 @@ namespace mgn {
             heightmap_info.errors_occured = false;
 
             provider_->GetHeightmap(heightmap_info);
+
+            has_errors_ = heightmap_info.errors_occured;
         }
         void HeightmapTask::Process()
         {
-            node_->OnHeightmapTaskCompleted(image_);
+            node_->OnHeightmapTaskCompleted(image_, has_errors_);
         }
 
     } // namespace terrain

@@ -23,6 +23,7 @@ namespace mgn {
         private:
             MercatorProvider * provider_;
             graphics::Image image_;
+            bool has_errors_;
         };
 
     } // namespace terrain

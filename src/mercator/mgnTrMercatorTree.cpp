@@ -10,6 +10,8 @@
 
 #include "mgnTrMercatorTaskTexture.h"
 #include "mgnTrMercatorTaskHeightmap.h"
+#include "mgnTrMercatorTaskLabels.h"
+#include "mgnTrMercatorTaskIcons.h"
 
 #include "mgnMdTerrainView.h"
 
@@ -361,15 +363,13 @@ namespace mgn {
             bool has_albedo = node->map_tile_.HasAlbedoTexture();
             bool has_heightmap = node->map_tile_.HasHeightmapTexture();
 
-            if (!has_albedo && !node->request_albedo_)
+            if (!has_albedo)
             {
-                node->request_albedo_ = true;
-                service_->AddTask(new TextureTask(node, provider_));
+                RequestTexture(node);
             }
-            if (!has_heightmap && !node->request_heightmap_)
+            if (!has_heightmap)
             {
-                node->request_heightmap_ = true;
-                service_->AddTask(new HeightmapTask(node, provider_));
+                RequestHeightmap(node);
             }
             if (preprocess_)
             {
@@ -519,6 +519,38 @@ namespace mgn {
 
             // And sort tasks queue in service
             service_->SortTasks();
+        }
+        void MercatorTree::RequestTexture(MercatorNode* node)
+        {
+            if (!node->request_albedo_)
+            {
+                node->request_albedo_ = true;
+                service_->AddTask(new TextureTask(node, provider_));
+            }
+        }
+        void MercatorTree::RequestHeightmap(MercatorNode* node)
+        {
+            if (!node->request_heightmap_)
+            {
+                node->request_heightmap_ = true;
+                service_->AddTask(new HeightmapTask(node, provider_));
+            }
+        }
+        void MercatorTree::RequestLabels(MercatorNode* node)
+        {
+            if (!node->request_labels_)
+            {
+                node->request_labels_ = true;
+                service_->AddTask(new LabelsTask(node, provider_));
+            }
+        }
+        void MercatorTree::RequestIcons(MercatorNode* node)
+        {
+            if (!node->request_icons_)
+            {
+                node->request_icons_ = true;
+                service_->AddTask(new IconsTask(node, provider_));
+            }
         }
         const int MercatorTree::grid_size() const
         {
