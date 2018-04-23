@@ -10,14 +10,16 @@ namespace mgn {
         class ActiveTrackSegment : public DottedLineSegment
         {
         public:
-            ActiveTrackSegment(const mgnMdWorldPoint& begin, const mgnMdWorldPoint& end, bool has_break = false)
+            ActiveTrackSegment(const mgnMdWorldPoint& begin, const mgnMdWorldPoint& end, bool has_break, bool to_location)
                 : DottedLineSegment(begin, end)
                 , mHasBreak(has_break)
+                , mToLocation(to_location)
             {
             }
             virtual ~ActiveTrackSegment() {}
 
             bool mHasBreak;
+            bool mToLocation; //!< segment is temporary, shows the way to current location
         };
 
         //! Class for rendering active track
@@ -28,6 +30,8 @@ namespace mgn {
             ActiveTrackRenderer(graphics::Renderer * renderer, mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * provider,
                 graphics::Shader * shader, const mgnMdWorldPosition * gps_pos);
             virtual ~ActiveTrackRenderer();
+
+            void render(const math::Frustum& frustum);
 
         protected:
 
@@ -42,10 +46,13 @@ namespace mgn {
 
             void createTexture();
             void doFetch();
+            void addSegment(const mgnMdWorldPoint& begin, const mgnMdWorldPoint& end, bool has_break, bool to_location);
 
         private:
 
             int mNumPoints; //!< old points count of UGDS track
+            bool mVisible;
+            bool mIsLoading;
         };
 
     } // namespace terrain

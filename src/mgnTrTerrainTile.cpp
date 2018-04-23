@@ -6,6 +6,7 @@
 #include "mgnTrAtlasLabel.h"
 #include "mgnTrHeightmap.h"
 #include "mgnTrHighlightTrackRenderer.h"
+#include "mgnTrPassiveHighlightTrackRenderer.h"
 
 #include "mgnMdBitmap.h"
 
@@ -110,9 +111,12 @@ namespace mgn {
         , mUpdateTextureRequested(false)
         , mUpdateUserData(false)
         , mUpdateUserDataRequested(false)
+        , mUpdatePassiveHighlight(true)
+        , mUpdatePassiveHighlightRequested(false)
         , mHighlightMessage(0)
         {
             mgnCriticalSectionInitialize(&mCriticalSection);
+            mPassiveHighlightTrackChunk = new PassiveHighlightTrackChunk(owner->pPassiveHighlightTrackRenderer, this);
             mHighlightTrackChunk = new HighlightTrackChunk(owner->pHighlightTrackRenderer, this);
             calcBoundingBox();
         }
@@ -120,6 +124,7 @@ namespace mgn {
         TerrainTile::~TerrainTile()
         {
             delete mHighlightTrackChunk;
+            delete mPassiveHighlightTrackChunk;
 
             if (mHeightSamples)
             {
@@ -151,11 +156,16 @@ namespace mgn {
         }
         void TerrainTile::updateTracks() // this function is called every frame
         {
+            mPassiveHighlightTrackChunk->update();
             mHighlightTrackChunk->update();
         }
         void TerrainTile::fetchTracks() // called in other thread
         {
             mHighlightTrackChunk->fetchTriangles();
+        }
+        void TerrainTile::fetchPassiveHighlight() // called in other thread
+        {
+            mPassiveHighlightTrackChunk->fetchTriangles();
         }
 
         int   TerrainTile::GetMapScaleIndex () const
@@ -400,11 +410,30 @@ namespace mgn {
 
             if (point_user_objects.empty()) return;
 
-            for (size_t i = 0; i < point_user_objects.size(); ++i)
+            for (std::vector<PointUserObjectInfo>::iterator it = point_user_objects.begin(); it != point_user_objects.end(); ++it)
             {
-                PointUserObjectInfo &pui = point_user_objects[i];
+                PointUserObjectInfo &pui = *it;
 
-                TerrainMap::IconTextureCache::iterator it_cache = mOwner->mIconTextureCache.find((void*)pui.bmp);
+                // Filter out duplicates (POIs that stand in the same position)
+                bool has_duplicate = false;
+                std::vector<PointUserObjectInfo>::iterator dit = it; ++dit;
+                for (; dit != point_user_objects.end(); ++dit)
+                {
+                    PointUserObjectInfo &other_pui = *dit;
+                    const double kPrecision = 2.0; // in pixels
+                    if (fabs(pui.lat - other_pui.lat) < kPrecision &&
+                        fabs(pui.lon - other_pui.lon) < kPrecision) // the same position
+                    {
+                        has_duplicate = true;
+                        break;
+                    }
+                }
+                if (has_duplicate)
+                    continue;
+
+                size_t bitmap_hash = pui.hash();
+
+                TerrainMap::IconTextureCache::iterator it_cache = mOwner->mIconTextureCache.find(bitmap_hash);
                 if (it_cache != mOwner->mIconTextureCache.end()) // texture with this ID exists in cache
                 {
                     graphics::Texture * texture = it_cache->second;
@@ -482,7 +511,7 @@ namespace mgn {
                         graphics::Image::Format::kRGBA8, graphics::Texture::Filter::kTrilinear, udata);
                 }
                 
-                mOwner->mIconTextureCache.insert(std::make_pair<void*, graphics::Texture*>((void*)pui.bmp, tex));
+                mOwner->mIconTextureCache.insert(std::make_pair<size_t, graphics::Texture*>(bitmap_hash, tex));
                 
                 Icon *icon = new Icon(mOwner->renderer_, mOwner->mTerrainView,
                     mOwner->mBillboardShader, &mPosition, pui, mKey.magIndex);
@@ -613,6 +642,7 @@ namespace mgn {
         }
         void TerrainTile::drawSegments(const math::Frustum& frustum)
         {
+            mPassiveHighlightTrackChunk->render(frustum);
             mHighlightTrackChunk->render(frustum);
         }
         void TerrainTile::drawTileMesh(const math::Frustum& frustum, graphics::Shader * shader)

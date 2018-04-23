@@ -6,6 +6,8 @@
 #include "MapDrawing/Graphics/mgnMatrix.h"
 #include "Frustum.h"
 
+#include "mgnMdMapObjectsVector.h"
+
 #include <string>
 #include <vector>
 
@@ -14,6 +16,7 @@ class mgnMdTerrainView;
 class mgnMdTerrainProvider;
 
 namespace mgn {
+    class TimeManager;
     namespace graphics {
         class Renderer;
         class Shader;
@@ -24,7 +27,6 @@ namespace mgn {
     namespace terrain {
 
         // Forward declaration
-        class FakeTerrain;
         class VehicleRenderer;
         class GpsMmPositionRenderer;
         class RouteBeginRenderer;
@@ -34,6 +36,7 @@ namespace mgn {
         class DirectionalLineRenderer;
         class ActiveTrackRenderer;
         class HighlightTrackRenderer;
+        class PassiveHighlightTrackRenderer;
         class TerrainMap;
         class MercatorTree;
         class MercatorProvider;
@@ -63,6 +66,10 @@ namespace mgn {
             void GetSelectedTracks(int x, int y, int radius, std::vector<int>& ids) const;
             //! Returns trails IDs under cursor
             void GetSelectedTrails(int x, int y, int radius, bool online, std::vector<std::string>& ids) const;
+            //! Returns icon IDs under cursor
+            void GetSelectedPOIs(int x, int y, int radius, TMapObjectsVector& objects) const;
+            //! Updates POI selection
+            void UpdatePOISelection(const std::vector<int>& selection);
 
         private:
             void UpdateProjectionMatrix();
@@ -77,6 +84,8 @@ namespace mgn {
             math::Matrix4 mProjectionViewMatrix;
             math::Frustum mFrustum;
 
+            mgn::TimeManager * mTimeManager;
+
             mgnMdTerrainView * mTerrainView;
             mgnMdTerrainProvider * mTerrainProvider;
             MercatorProvider * mMercatorProvider;
@@ -84,13 +93,13 @@ namespace mgn {
             DirectionalLineRenderer * mDirectionalLineRenderer;
             ActiveTrackRenderer * mActiveTrackRenderer;
             HighlightTrackRenderer * mHighlightTrackRenderer;
+            PassiveHighlightTrackRenderer * mPassiveHighlightTrackRenderer;
             GuidanceArrowRenderer * mGuidanceArrowRenderer;
             ManeuverRenderer* mManeuverRenderer;
             RouteBeginRenderer * mRouteBeginRenderer;
             RouteEndRenderer * mRouteEndRenderer;
             GpsMmPositionRenderer * mGpsMmPositionRenderer;
             VehicleRenderer * mVehicleRenderer;
-            FakeTerrain * mFakeTerrain;
 
             MercatorTree * mMercatorTree;
 

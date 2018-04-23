@@ -32,7 +32,7 @@ namespace mgn {
             if (index_buffer_)
                 renderer_->DeleteIndexBuffer(index_buffer_);
         }
-        void SolidLineSegmentRenderData::prepare(const std::vector<vec2>& vertices_array)
+        bool SolidLineSegmentRenderData::prepare(const std::vector<vec2>& vertices_array)
         {
             // 1. Transform triangles into arrays
             const size_t num_vertices = vertices_array.size();
@@ -42,7 +42,15 @@ namespace mgn {
             const size_t index_size = sizeof(mgnI16_t);
 
             float * vertices = reinterpret_cast<float*>(new char[num_vertices * vertex_size]);
+            if (vertices == NULL)
+                return false;
+
             mgnI16_t * indices = new mgnI16_t[num_indices];
+            if (indices == NULL)
+            {
+                delete[] vertices;
+                return false;
+            }
 
             TerrainTile const * tile = mOwnerSegment->getTile();
             assert(tile);
@@ -62,9 +70,12 @@ namespace mgn {
             // 2. Map it into video memory
             renderer_->AddVertexBuffer(vertex_buffer_, num_vertices * vertex_size, vertices, graphics::BufferUsage::kStaticDraw);
             renderer_->AddIndexBuffer(index_buffer_, num_indices, index_size, indices, graphics::BufferUsage::kStaticDraw);
-
+        
             delete[] vertices;
             delete[] indices;
+
+            return vertex_buffer_ != NULL
+                && index_buffer_  != NULL;
         }
         void SolidLineSegmentRenderData::render()
         {
@@ -147,13 +158,20 @@ namespace mgn {
             float cam_dist = (float)tile->mOwner->getTerrainView()->getCamDistance();
             float distance_gain = cam_dist * 0.010f;
             return width * 0.1f * std::max(distance_gain, 1.0f);
+            // float kWidthMultiplier = (float)tile->mOwner->getTerrainView()->getCellSizeLat() / 512.0f;
+            // return width * kWidthMultiplier;
         }
         void SolidLineSegment::prepare(graphics::Renderer * renderer, const std::vector<vec2>& vertices)
         {
             mNeedToAlloc = false;
             if (vertices.size() == 0) return;
             mRenderData = new SolidLineSegmentRenderData(renderer, this);
-            mRenderData->prepare(vertices);
+            if (!mRenderData->prepare(vertices))
+            {
+                // Prepare may fail due to some memory issues
+                delete mRenderData;
+                mRenderData = NULL;
+            }
         }
         void SolidLineSegment::render(const math::Frustum& frustum)
         {
@@ -210,6 +228,7 @@ namespace mgn {
         {
             graphics::Renderer * renderer = mOwner->renderer_;
             graphics::Shader * shader = mOwner->shader_;
+            float offset = mOwner->offset_;
 
             renderer->ChangeVertexFormat(mOwner->vertex_format_);
 
@@ -222,7 +241,7 @@ namespace mgn {
             if (mOwner->mIsUsingQuads)
                 renderer->DisableDepthTest();
             else
-                renderer->context()->EnablePolygonOffset(-1.0f, -1.0f);
+                renderer->context()->EnablePolygonOffset(offset, offset);
 
             for (std::vector<Part>::iterator itp = mParts.begin(); itp != mParts.end(); ++itp)
             {
@@ -245,6 +264,7 @@ namespace mgn {
         void SolidLineChunk::fetchTriangles()
         {
             const int kTileHeightSamples = GetTileHeightSamples();
+            const bool flat_tile = mTile->mBoundingBox.extent.y < 0.01f;
             for (FetchMap::iterator it = mFetchMap.begin(); it != mFetchMap.end(); ++it)
             {
                 SolidLineSegment * segment = it->first;
@@ -304,44 +324,62 @@ namespace mgn {
                 if (max_ind_x < 0 || min_ind_x > kTileHeightSamples-2 || 
                     max_ind_y < 0 || min_ind_y > kTileHeightSamples-2)
                     continue;
-                // clamp indices to be in bound
-                min_ind_x = TerrainTile::clampIndX( min_ind_x );
-                max_ind_x = TerrainTile::clampIndX( max_ind_x );
-                if (min_ind_x > max_ind_x) // this case shouldn't be
-                    std::swap(min_ind_x, max_ind_x);
-                min_ind_y = TerrainTile::clampIndY( min_ind_y );
-                max_ind_y = TerrainTile::clampIndY( max_ind_y );
-                if (min_ind_y > max_ind_y) // this case shouldn't be
-                    std::swap(min_ind_y, max_ind_y);
-                vertices.reserve( (max_ind_y-min_ind_y+1) * (max_ind_x-min_ind_x+1) * 6 );
-                for (int j = min_ind_y; j <= max_ind_y; ++j)
-                for (int i = min_ind_x; i <= max_ind_x; ++i)
-                {
-                    vertices.push_back(vec2(terrain_begin.x - (i  ) * tile_size_x, terrain_begin.y - (j  ) * tile_size_y));
-                    vertices.push_back(vec2(terrain_begin.x - (i+1) * tile_size_x, terrain_begin.y - (j  ) * tile_size_y));
-                    vertices.push_back(vec2(terrain_begin.x - (i+1) * tile_size_x, terrain_begin.y - (j+1) * tile_size_y));
-                    vertices.push_back(vec2(terrain_begin.x - (i  ) * tile_size_x, terrain_begin.y - (j  ) * tile_size_y));
-                    vertices.push_back(vec2(terrain_begin.x - (i+1) * tile_size_x, terrain_begin.y - (j+1) * tile_size_y));
-                    vertices.push_back(vec2(terrain_begin.x - (i  ) * tile_size_x, terrain_begin.y - (j+1) * tile_size_y));
-                }
 
-                // 3.3. Enumerate all triangles and find intersections for each side by our rect.
-                result_vertices.reserve( vertices.size() );
-                clipping::fixed_poly_t c_clipper, c_subject;
-                c_clipper.len = 4;
-                memcpy(c_clipper.v, (clipping::vec_t*)&clipper[0], sizeof(clipping::vec_t) * 4);
-                c_subject.len = 3;
-                int winding_dir = clipping::fixed_poly_winding(&c_clipper);
-                for (size_t j = 0; j < vertices.size(); j += 3)
+                // 3.2.3. Don't split clipper rectangle if tile is flat
+                if (flat_tile)
                 {
-                    memcpy(c_subject.v, &vertices[j], sizeof(clipping::vec_t) * 3);
-                    clipping::fixed_poly_t res;
-                    clipping::fixed_poly_clip(&c_subject, &c_clipper, winding_dir, &res);
-                    for (int i = 2; i < res.len; ++i) // transform polygon into triangle fan
+                    // Segment quad
+                    result_vertices.reserve(6);
+                    result_vertices.push_back(clipper[0]);
+                    result_vertices.push_back(clipper[3]);
+                    result_vertices.push_back(clipper[1]);
+                    result_vertices.push_back(clipper[1]);
+                    result_vertices.push_back(clipper[3]);
+                    result_vertices.push_back(clipper[2]);
+                }
+                else // not flat - common case
+                {
+                    // clamp indices to be in bound
+                    min_ind_x = TerrainTile::clampIndX( min_ind_x );
+                    max_ind_x = TerrainTile::clampIndX( max_ind_x );
+                    if (min_ind_x > max_ind_x) // this case shouldn't be
+                        std::swap(min_ind_x, max_ind_x);
+                    min_ind_y = TerrainTile::clampIndY( min_ind_y );
+                    max_ind_y = TerrainTile::clampIndY( max_ind_y );
+                    if (min_ind_y > max_ind_y) // this case shouldn't be
+                        std::swap(min_ind_y, max_ind_y);
+                    vertices.reserve( (max_ind_y-min_ind_y+1) * (max_ind_x-min_ind_x+1) * 6 );
+                    for (int j = min_ind_y; j <= max_ind_y; ++j)
                     {
-                        result_vertices.push_back(vec2(res.v[0  ].x, res.v[0  ].y));
-                        result_vertices.push_back(vec2(res.v[i-1].x, res.v[i-1].y));
-                        result_vertices.push_back(vec2(res.v[i  ].x, res.v[i  ].y));
+                        for (int i = min_ind_x; i <= max_ind_x; ++i)
+                        {
+                            vertices.push_back(vec2(terrain_begin.x - (i  ) * tile_size_x, terrain_begin.y - (j  ) * tile_size_y));
+                            vertices.push_back(vec2(terrain_begin.x - (i+1) * tile_size_x, terrain_begin.y - (j  ) * tile_size_y));
+                            vertices.push_back(vec2(terrain_begin.x - (i+1) * tile_size_x, terrain_begin.y - (j+1) * tile_size_y));
+                            vertices.push_back(vec2(terrain_begin.x - (i  ) * tile_size_x, terrain_begin.y - (j  ) * tile_size_y));
+                            vertices.push_back(vec2(terrain_begin.x - (i+1) * tile_size_x, terrain_begin.y - (j+1) * tile_size_y));
+                            vertices.push_back(vec2(terrain_begin.x - (i  ) * tile_size_x, terrain_begin.y - (j+1) * tile_size_y));
+                        }
+                    }
+
+                    // 3.3. Enumerate all triangles and find intersections for each side by our rect.
+                    result_vertices.reserve( vertices.size() );
+                    clipping::fixed_poly_t c_clipper, c_subject;
+                    c_clipper.len = 4;
+                    memcpy(c_clipper.v, (clipping::vec_t*)&clipper[0], sizeof(clipping::vec_t) * 4);
+                    c_subject.len = 3;
+                    int winding_dir = clipping::fixed_poly_winding(&c_clipper);
+                    for (size_t j = 0; j < vertices.size(); j += 3)
+                    {
+                        memcpy(c_subject.v, &vertices[j], sizeof(clipping::vec_t) * 3);
+                        clipping::fixed_poly_t res;
+                        clipping::fixed_poly_clip(&c_subject, &c_clipper, winding_dir, &res);
+                        for (int i = 2; i < res.len; ++i) // transform polygon into triangle fan
+                        {
+                            result_vertices.push_back(vec2(res.v[0  ].x, res.v[0  ].y));
+                            result_vertices.push_back(vec2(res.v[i-1].x, res.v[i-1].y));
+                            result_vertices.push_back(vec2(res.v[i  ].x, res.v[i  ].y));
+                        }
                     }
                 }
 
@@ -387,19 +425,32 @@ namespace mgn {
                         vec2 vc = v1 * (cos(a) * hw) - left * (sin(a) * hw);
                         joint_clipper.push_back( prev_segment->end() + vc );
                     }
-                    clipping::poly_t d_clipper = {(int)joint_clipper.size(), 0, &joint_clipper[0]};
-                    clipping::poly_t d_subject = {3, 0, NULL};
-                    for (size_t j = 0; j < vertices.size(); j += 3)
+                    if (flat_tile)
                     {
-                        d_subject.v = &vertices[j];
-                        clipping::poly res = clipping::poly_clip(&d_subject, &d_clipper);
-                        for (int i = 2; i < res->len; ++i) // transform polygon into triangle fan
+                        // Joint clipper is a triangle fan
+                        for (int i = 0; i < n; ++i)
                         {
-                            result_vertices.push_back(vec2(res->v[0  ].x, res->v[0  ].y));
-                            result_vertices.push_back(vec2(res->v[i-1].x, res->v[i-1].y));
-                            result_vertices.push_back(vec2(res->v[i  ].x, res->v[i  ].y));
+                            result_vertices.push_back(joint_clipper[0]);
+                            result_vertices.push_back(joint_clipper[i+2]);
+                            result_vertices.push_back(joint_clipper[i+1]);
                         }
-                        clipping::poly_free(res);
+                    }
+                    else // not flat
+                    {
+                        clipping::poly_t d_clipper = {(int)joint_clipper.size(), 0, &joint_clipper[0]};
+                        clipping::poly_t d_subject = {3, 0, NULL};
+                        for (size_t j = 0; j < vertices.size(); j += 3)
+                        {
+                            d_subject.v = &vertices[j];
+                            clipping::poly res = clipping::poly_clip(&d_subject, &d_clipper);
+                            for (int i = 2; i < res->len; ++i) // transform polygon into triangle fan
+                            {
+                                result_vertices.push_back(vec2(res->v[0  ].x, res->v[0  ].y));
+                                result_vertices.push_back(vec2(res->v[i-1].x, res->v[i-1].y));
+                                result_vertices.push_back(vec2(res->v[i  ].x, res->v[i  ].y));
+                            }
+                            clipping::poly_free(res);
+                        }
                     }
                 }
             }
@@ -463,6 +514,7 @@ namespace mgn {
             , provider_(provider)
             , shader_(shader)
             , gps_pos_(gps_pos)
+            , offset_(-1.0f)
             , mGpsPosition(0.0, 0.0)
             , mStoredMagIndex(0)
             , mIsUsingQuads(false)
@@ -527,9 +579,17 @@ namespace mgn {
 
             shader_->Unbind();
         }
+        mgnMdTerrainView * SolidLineRenderer::terrain_view()
+        {
+            return terrain_view_;
+        }
         mgnMdTerrainProvider * SolidLineRenderer::provider()
         {
             return provider_;
+        }
+        const mgnMdWorldPosition * SolidLineRenderer::gps_pos()
+        {
+            return gps_pos_;
         }
         mgnMdWorldRect SolidLineRenderer::GetWorldRect() const
         {

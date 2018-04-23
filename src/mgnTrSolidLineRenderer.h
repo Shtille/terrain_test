@@ -32,7 +32,7 @@ namespace mgn {
             SolidLineSegmentRenderData(graphics::Renderer * renderer, SolidLineSegment * owner_segment);
             ~SolidLineSegmentRenderData();
 
-            void prepare(const std::vector<vec2>& vertices);
+            bool prepare(const std::vector<vec2>& vertices);
             void render();
 
         private:
@@ -151,7 +151,9 @@ namespace mgn {
             virtual void update();
             virtual void render(const math::Frustum& frustum);
 
+            mgnMdTerrainView * terrain_view();
             mgnMdTerrainProvider * provider();
+            const mgnMdWorldPosition * gps_pos();
 
             // Derived from mgnMdIUserDataDrawContext
             mgnMdWorldRect GetWorldRect() const;
@@ -176,6 +178,7 @@ namespace mgn {
             graphics::Shader * shader_;
             const mgnMdWorldPosition * gps_pos_;
 
+            float offset_;
             mgnMdWorldPosition mGpsPosition; //!< needed for search context
             unsigned short mStoredMagIndex; //!< needed for recreation
 

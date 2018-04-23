@@ -1,6 +1,6 @@
 #pragma once
-#ifndef __MGN_TERRAIN_HIGHLIGHT_TRACK_RENDERER_H__
-#define __MGN_TERRAIN_HIGHLIGHT_TRACK_RENDERER_H__
+#ifndef __MGN_TERRAIN_PASSIVE_HIGHLIGHT_TRACK_RENDERER_H__
+#define __MGN_TERRAIN_PASSIVE_HIGHLIGHT_TRACK_RENDERER_H__
 
 #include "mgnTrSolidLineRenderer.h"
 
@@ -15,32 +15,29 @@ namespace mgn {
         class mgnTerrainFetcher;
 
         //! Class for rendering highlight track chunk
-        class HighlightTrackChunk : public SolidLineChunk
+        class PassiveHighlightTrackChunk : public SolidLineChunk
         {
         public:
-            HighlightTrackChunk(SolidLineRenderer * owner, TerrainTile const * tile);
-            virtual ~HighlightTrackChunk();
+            PassiveHighlightTrackChunk(SolidLineRenderer * owner, TerrainTile const * tile);
+            virtual ~PassiveHighlightTrackChunk();
 
             void load(bool is_high_priority); //!< initially loads data
             void update();
 
-            void checkPointsCount();
+            void RequestUpdate();
 
         private:
-            mgnMdWorldPosition mOldGpsPosition;
-            int mLastPointsCount;
-            bool mLoadRequested;
         };
 
         //! Class for rendering highlight track
-        class HighlightTrackRenderer : public SolidLineRenderer
+        class PassiveHighlightTrackRenderer : public SolidLineRenderer
         {
-            friend class HighlightTrackChunk;
+            friend class PassiveHighlightTrackChunk;
         public:
-            HighlightTrackRenderer(graphics::Renderer * renderer, mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * provider,
+            PassiveHighlightTrackRenderer(graphics::Renderer * renderer, mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * provider,
                 graphics::Shader * shader, const mgnMdWorldPosition * gps_pos, mgnTerrainFetcher * fetcher,
                 mgn::TimeManager * time_manager);
-            virtual ~HighlightTrackRenderer();
+            virtual ~PassiveHighlightTrackRenderer();
 
             virtual void update();
 
@@ -48,7 +45,6 @@ namespace mgn {
 
         protected:
             void doFetch();
-            void checkPointsCount();
 
         private:
             mgnTerrainFetcher * mFetcher;
@@ -56,7 +52,6 @@ namespace mgn {
             mgnMdWorldPosition  mOldGpsPosition; //!< old gps position
             float mTrackWidth;
             mgn::Timer * mTimer;
-            mgn::Timer * mPointCheckTimer;
         };
 
     } // namespace terrain

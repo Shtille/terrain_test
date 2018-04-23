@@ -40,7 +40,7 @@ precision highp float;                                                          
 uniform vec4 u_color;                                                                            \r\n\
                                                                                                  \r\n\
 // Fog parameters                                                                                \r\n\
-uniform bool u_fog_enabled;                                                                      \r\n\
+uniform float u_fog_modifier;                                                                    \r\n\
 uniform float u_z_far;                                                                           \r\n\
                                                                                                  \r\n\
 varying vec3 v_view_position;                                                                    \r\n\
@@ -48,16 +48,14 @@ varying vec3 v_view_position;                                                   
 void main()                                                                                      \r\n\
 {                                                                                                \r\n\
     vec4 color = u_color;                                                                        \r\n\
-    if (u_fog_enabled)                                                                           \r\n\
-    {                                                                                            \r\n\
-        float view_length = length(v_view_position);                                             \r\n\
-        float fog_distance = view_length / u_z_far;                                              \r\n\
-        const float kFogBegin = 0.6;                                                             \r\n\
-        const float kFogEnd   = 0.8;                                                             \r\n\
-        float fog_factor = clamp((fog_distance - kFogBegin) / (kFogEnd - kFogBegin), 0.0, 1.0);  \r\n\
-        const vec4 fog_color = vec4(0.5, 0.6, 0.8, 1.0);                                         \r\n\
-        color = mix(color, fog_color, fog_factor);                                               \r\n\
-    }                                                                                            \r\n\
+    float view_length = length(v_view_position);                                                 \r\n\
+    float fog_distance = view_length / u_z_far;                                                  \r\n\
+    const float kFogBegin = 0.6;                                                                 \r\n\
+    const float kFogEnd   = 0.8;                                                                 \r\n\
+    float fog_factor = clamp((fog_distance - kFogBegin) / (kFogEnd - kFogBegin), 0.0, 1.0);      \r\n\
+    fog_factor = fog_factor * u_fog_modifier;                                                    \r\n\
+    const vec4 fog_color = vec4(0.5, 0.6, 0.8, 1.0);                                             \r\n\
+    color = mix(color, fog_color, fog_factor);                                                   \r\n\
     gl_FragColor = color;                                                                        \r\n\
 }";
 

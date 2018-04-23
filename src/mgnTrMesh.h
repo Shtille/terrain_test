@@ -41,6 +41,8 @@ namespace mgn {
             graphics::IndexBuffer * index_buffer_;
 
             std::vector<graphics::VertexAttribute> attribs_;
+
+            bool can_render_;
         };
         
     } // namespace terrain

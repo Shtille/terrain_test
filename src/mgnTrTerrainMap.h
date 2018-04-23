@@ -1,12 +1,14 @@
 #pragma once  
 
 #include "mgnTrTerrainTile.h"
+#include "mgnMdMapObjectsVector.h"
 
 namespace mgn {
     namespace terrain {
 
         class Font;
         class HighlightTrackRenderer;
+        class PassiveHighlightTrackRenderer;
         class mgnTerrainFetcher;
         class TileCache;
 
@@ -37,7 +39,7 @@ namespace mgn {
             mgnTerrainFetcher  *mFetcher;
             TileCache          *mTileCache;
 
-            typedef std::map<void*, graphics::Texture*> IconTextureCache;
+            typedef std::map<size_t, graphics::Texture*> IconTextureCache;
             mutable IconTextureCache mIconTextureCache;
 
             typedef std::map<unsigned int, graphics::Texture*> ShieldTextureCache;
@@ -48,6 +50,7 @@ namespace mgn {
             const mgnMdWorldPosition * pGpsPosition;
 
             HighlightTrackRenderer * pHighlightTrackRenderer;
+            PassiveHighlightTrackRenderer * pPassiveHighlightTrackRenderer;
 
             bool mOnlineRasterMapsEnabled;
 
@@ -78,6 +81,10 @@ namespace mgn {
             void setHighlightRenderer(HighlightTrackRenderer * highlight_renderer)
             {
                 pHighlightTrackRenderer = highlight_renderer;
+            }
+            void setPassiveHighlightRenderer(PassiveHighlightTrackRenderer * highlight_renderer)
+            {
+                pPassiveHighlightTrackRenderer = highlight_renderer;
             }
             mgnTerrainFetcher& getFetcher()
             {
@@ -112,6 +119,8 @@ namespace mgn {
             void GetSelectedIcons(int x, int y, int radius, std::vector<int>& ids) const;
             void GetSelectedTracks(int x, int y, int radius, std::vector<int>& ids) const;
             void GetSelectedTrails(int x, int y, int radius, bool onLine, std::vector<std::string>& ids) const;
+            void GetSelectedPOIs(int x, int y, int radius, TMapObjectsVector& objects) const;
+            void UpdatePOISelection(const std::vector<int>& selection);
 
             void IntersectionWithRay(const vec3& ray, vec3& intersection) const;
         };

@@ -46,7 +46,7 @@ namespace mgn {
 
             mTerrainView->WorldToLocal(world_point, vehicle_x, vehicle_y);
 
-            mScale = (float)std::max(mTerrainView->getCamDistance() * 0.08, 1.0);
+            mScale = (float)std::max(mTerrainView->getCamDistance() * 0.053, 1.0);
             float delta_h = 0.2f * mScale;
             if (delta_h < 1.0f) delta_h = 0.0f;
             mPosition.x = static_cast<float>(vehicle_x);

@@ -15,6 +15,8 @@ namespace mgn {
                 graphics::Shader * shader, const vec3* tile_position, const PointUserObjectInfo &pui, unsigned short magIndex)
         : Billboard(renderer, terrain_view, shader, tile_position, 0.001f)
         , mID(pui.id)
+        , mMapObjectInfo(pui.poi_info)
+        , mIsPOI(pui.is_poi)
         {
             Create(pui, magIndex);
             MakeRenderable();
@@ -25,6 +27,14 @@ namespace mgn {
         int Icon::getID() const
         {
             return mID;
+        }
+        const mgnMdMapObjectInfo& Icon::getMapObjectInfo() const
+        {
+            return mMapObjectInfo;
+        }
+        bool Icon::isPOI() const
+        {
+            return mIsPOI;
         }
         void Icon::GetIconSize(vec2& size)
         {

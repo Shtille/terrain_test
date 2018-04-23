@@ -47,8 +47,6 @@ namespace mgn {
         return mTime;
     }
 
-    TimeManager * TimeManager::mInstance = NULL;
-
     TimeManager::TimeManager()
     : mLastTime(0)
     , mFrameTime(0)
@@ -68,18 +66,6 @@ namespace mgn {
             timer = timer->mNext;
             delete timer_to_delete;
         }
-    }
-    void TimeManager::CreateInstance()
-    {
-        mInstance = new TimeManager();
-    }
-    void TimeManager::DestroyInstance()
-    {
-        delete mInstance;
-    }
-    TimeManager * TimeManager::GetInstance()
-    {
-        return mInstance;
     }
     void TimeManager::Update()
     {

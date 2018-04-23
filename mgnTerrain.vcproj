@@ -517,6 +517,14 @@
 				>
 			</File>
 			<File
+				RelativePath=".\src\mgnTrPassiveHighlightTrackRenderer.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\src\mgnTrPassiveHighlightTrackRenderer.h"
+				>
+			</File>
+			<File
 				RelativePath=".\src\mgnTrRenderer.cpp"
 				>
 			</File>

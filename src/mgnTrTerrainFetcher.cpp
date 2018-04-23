@@ -303,6 +303,10 @@ namespace mgn {
                     assert(tile);
                     tile->fetchTracks();
                     break;
+                case mgnTerrainFetcher::FETCH_PASSIVE_HIGHLIGHT:
+                    assert(tile);
+                    tile->fetchPassiveHighlight();
+                    break;
                 case mgnTerrainFetcher::REFETCH_TEXTURE:
                     assert(tile);
                     tile->fetchTexture();

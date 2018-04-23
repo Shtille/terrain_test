@@ -9,9 +9,6 @@
 #include "mgnPolygonClipping.h"
 #include "mgnTimeManager.h"
 
-namespace {
-    const float kTrackWidth = 10.0f;
-}
 static inline vec3 MakeColorFrom565(mgnU16_t color565)
 {
     return vec3(
@@ -24,9 +21,30 @@ static inline vec3 MakeColorFrom565(mgnU16_t color565)
 namespace mgn {
     namespace terrain {
 
+        class HighlightCutPointContext : public mgnMdIUserDataDrawContext {
+        public:
+            explicit HighlightCutPointContext(mgnMdTerrainView * terrain_view, const mgnMdWorldPosition * gps_pos)
+            : gps_pos_(gps_pos)
+            {
+                world_rect_ = terrain_view->getLowDetailWorldRect();
+            }
+            mgnMdWorldRect GetWorldRect() const { return world_rect_; }
+            int GetMapScaleIndex() const { return 1; }
+            float GetMapScaleFactor() const { return 30.0f; }
+            mgnMdWorldPosition GetGPSPosition() const { return *gps_pos_; }
+            bool ShouldDrawPOIs() const { return false; }
+            bool ShouldDrawLabels() const { return false; }
+
+        private:
+            const mgnMdWorldPosition * gps_pos_;
+            mgnMdWorldRect world_rect_;
+        };
+
         HighlightTrackChunk::HighlightTrackChunk(SolidLineRenderer * owner, TerrainTile const * tile)
             : SolidLineChunk(owner, tile)
             , mOldGpsPosition(0.0, 0.0)
+            , mLastPointsCount(0)
+            , mLoadRequested(false)
         {
         }
         HighlightTrackChunk::~HighlightTrackChunk()
@@ -46,6 +64,9 @@ namespace mgn {
                 mIsDataReady = true;
                 return;
             }
+
+            // Update track width on any load
+            const float kTrackWidth = ht_renderer->mTrackWidth;
 
             mParts.resize(highlight.parts.size());
             for (unsigned int j = 0; j < highlight.parts.size(); ++j)
@@ -71,14 +92,15 @@ namespace mgn {
             else
                 fetcher->addCommandLow(mgnTerrainFetcher::CommandData(const_cast<TerrainTile*>(mTile), 
                     mgnTerrainFetcher::UPDATE_TRACKS));
+
+            mLastPointsCount = highlight.points_count;
+            mLoadRequested = true;
         }
         void HighlightTrackChunk::update()
         {
             HighlightTrackRenderer * ht_renderer = dynamic_cast<HighlightTrackRenderer *>(mOwner);
             mgnTerrainFetcher * fetcher = ht_renderer->getFetcher();
             mgnMdTerrainProvider * provider = ht_renderer->provider();
-
-            bool has_track_been_removed = false;
 
             // Check messages first
             const bool highlight_exists = provider->isHighlightExist();
@@ -97,20 +119,21 @@ namespace mgn {
                 clear();
                 mIsFetched = false;
                 mIsDataReady = false;
-                has_track_been_removed = true;
+                mLastPointsCount = 0;
+                mTile->mHighlightMessage &= ~(int)GeoHighlight::kRemoveRoute;
             }
             if ((mTile->mHighlightMessage & (int)GeoHighlight::kAddRoute) ||
-                (mParts.empty() && !mIsFetched && highlight_exists))
+                (mParts.empty() && !mIsFetched && highlight_exists && mTile->isFetchedTerrain()))
             {
                 // If track has been removed it should have low priority
-                const bool first_time_load = !has_track_been_removed;
-                load(first_time_load);
+                load(true);
+                mTile->mHighlightMessage &= ~(int)GeoHighlight::kAddRoute;
             }
-            mTile->mHighlightMessage = (int)GeoHighlight::kNoMessages; // = 0
             if (mIsFetched) // data is ready
             {
                 generateData();
                 mIsDataReady = true;
+                mLoadRequested = false;
             }
 
             mgnMdWorldPosition p = mTile->GetGPSPosition();
@@ -119,13 +142,14 @@ namespace mgn {
             mOldGpsPosition = p;
 
             // Highlight trimming during simulation
+            mgnMdWorldPoint cut_point;
             const bool need_to_fetch = !mParts.empty() && pos_has_changed && mIsFetched &&
-                provider->fetchNeedToTrimHighlight();
+                provider->fetchHighlightCutPoint(HighlightCutPointContext(mOwner->terrain_view(), mOwner->gps_pos()), cut_point);
             if (need_to_fetch)
             {
                 const float kVehicleDistancePrecision = 1.0f;
                 vec2 vpos; // vehicle pos in tile cs
-                mTile->worldToTile(p.mLatitude, p.mLongitude, vpos.x, vpos.y);
+                mTile->worldToTile(cut_point.mLatitude, cut_point.mLongitude, vpos.x, vpos.y);
                 bool found_segment = false;
                 for (std::vector<Part>::iterator itp = mParts.begin(); itp != mParts.end(); ++itp)
                 {
@@ -158,6 +182,7 @@ namespace mgn {
                                 for (std::list<SolidLineSegment*>::iterator it = part.segments.begin(); it != it_next; ++it)
                                     delete *it;
                                 part.segments.erase(part.segments.begin(), it_next);
+                                const float kTrackWidth = ht_renderer->mTrackWidth;
                                 part.segments.push_front(new SolidLineSegment(projected_pos, segment_end, mTile, kTrackWidth, true));
                                 // Trim highlight stubs
                                 for (std::vector<Part>::iterator itp = mParts.begin(); itp != mParts.end(); ++itp)
@@ -185,33 +210,39 @@ namespace mgn {
                     if (found_segment)
                         break;
                 }
-                if (!found_segment)
-                {
-                    GeoHighlight highlight;
-                    provider->fetchHighlight( *mTile, highlight );
-                    if (highlight.points_count == 0)
-                    {
-                        // We may clear these segments
-                        clear();
-                        mIsFetched = false;
-                        mIsDataReady = false;
-                    }
-                }
+            }
+        }
+        void HighlightTrackChunk::checkPointsCount()
+        {
+            // There are some bad cases like highlight computation
+            int points_count = mOwner->provider()->fetcHighlightPointCount(*mTile);
+            if (mLastPointsCount < points_count && !mLoadRequested)
+            {
+                mLastPointsCount = points_count;
+                // Request highlight recreation
+                mTile->mHighlightMessage = (int)GeoHighlight::kRemoveRoute | (int)GeoHighlight::kAddRoute;
             }
         }
         //=======================================================================
         HighlightTrackRenderer::HighlightTrackRenderer(graphics::Renderer * renderer, mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * provider,
-                graphics::Shader * shader, const mgnMdWorldPosition * gps_pos, mgnTerrainFetcher * fetcher)
+                graphics::Shader * shader, const mgnMdWorldPosition * gps_pos, mgnTerrainFetcher * fetcher,
+                mgn::TimeManager * time_manager)
             : SolidLineRenderer(renderer, terrain_view, provider, shader, gps_pos)
             , mFetcher(fetcher)
+            , mTimeManager(time_manager)
             , mOldGpsPosition(0.0, 0.0)
+            , mTrackWidth(10.0f)
         {
+            offset_ = -2.0f;
             const mgnU32_t kTimerExpireInterval = 1500;
-            mTimer = mgn::TimeManager::GetInstance()->AddTimer(kTimerExpireInterval);
+            mTimer = mTimeManager->AddTimer(kTimerExpireInterval);
+            mPointCheckTimer = mTimeManager->AddTimer(1000);
+            mPointCheckTimer->Start();
         }
         HighlightTrackRenderer::~HighlightTrackRenderer()
         {
-            mgn::TimeManager::GetInstance()->RemoveTimer(mTimer);
+            mTimeManager->RemoveTimer(mPointCheckTimer);
+            mTimeManager->RemoveTimer(mTimer);
         }
         void HighlightTrackRenderer::update()
         {
@@ -228,9 +259,22 @@ namespace mgn {
                 mTimer->Stop();
                 recreateAll(); // update highlight widths
             }
+            if (mPointCheckTimer->HasExpired())
+            {
+                mPointCheckTimer->Reset();
+                checkPointsCount();
+            }
         }
         void HighlightTrackRenderer::doFetch()
         {
+        }
+        void HighlightTrackRenderer::checkPointsCount()
+        {
+            for (ChunkList::iterator it = mChunks.begin(); it != mChunks.end(); ++it)
+            {
+                HighlightTrackChunk * chunk = dynamic_cast<HighlightTrackChunk *>(*it);
+                chunk->checkPointsCount();
+            }
         }
         mgnTerrainFetcher * HighlightTrackRenderer::getFetcher()
         {

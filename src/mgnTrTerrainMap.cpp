@@ -82,8 +82,9 @@ namespace mgn {
           , mTerrainShader(terrain_shader)
           , mBillboardShader(billboard_shader)
           , pGpsPosition(gps_pos)
-          , mFrameCount(0)
           , pHighlightTrackRenderer(NULL)
+          , pPassiveHighlightTrackRenderer(NULL)
+          , mFrameCount(0)
         {
             mActiveTSParams = &mTileSetParams[0];
 
@@ -150,13 +151,21 @@ namespace mgn {
                 switch (cmd)
                 {
                 case mgnTerrainFetcher::FETCH_TERRAIN:
-                    tile->generateMesh();
-                    tile->mIsFetchedTerrain = true;
-                    if (!tile->mIsFetchedTexture || tile->isRefetchTexture())
+                    if (tile->isRefetchTerrain())
                     {
-                        mFetcher->addCommand(mgnTerrainFetcher::CommandData(tile, mgnTerrainFetcher::FETCH_TEXTURE));
-                        break;
+                        mFetcher->addCommand(mgnTerrainFetcher::CommandData(tile, mgnTerrainFetcher::FETCH_TERRAIN));
                     }
+                    else
+                    {
+                        // All is fine
+                        tile->generateMesh();
+                        tile->mIsFetchedTerrain = true;
+                        if (!tile->mIsFetchedTexture || tile->isRefetchTexture())
+                        {
+                            mFetcher->addCommand(mgnTerrainFetcher::CommandData(tile, mgnTerrainFetcher::FETCH_TEXTURE));
+                        }
+                    }
+                    break;
                 case mgnTerrainFetcher::FETCH_TEXTURE:
                     tile->generateTextures();
                     // TODO: We may simply exchange this shit on additional fetcher command (FETCH_LABELS)
@@ -177,22 +186,19 @@ namespace mgn {
                     tile->mIsFetched = true;
                     tile->generateUserObjects();
                     updateIconList(); // manual updating of icons when some new data appears
-                    if(!tile->isRefetchTexture())
-                        mTileCache->addTile(tile);
+                    mTileCache->addTile(tile);
                     break;
                 case mgnTerrainFetcher::UPDATE_TRACKS:
                     tile->mHighlightTrackChunk->mIsFetched = true;
                     break;
+                case mgnTerrainFetcher::FETCH_PASSIVE_HIGHLIGHT:
+                    tile->mPassiveHighlightTrackChunk->mIsFetched = true;
+                    break;
                 case mgnTerrainFetcher::REFETCH_TEXTURE:
                     tile->generateTextures();
-                    if (tile->mNeedToGenerateLabels && tile->isFetchedLabels())
-                        tile->generateLabels();
-                    tile->mIsFetchedTexture = true;
                     tile->mUpdateTextureRequested = false;
                     if (tile->isRefetchTexture())
                         mFetcher->addCommandLow(mgnTerrainFetcher::CommandData(tile, mgnTerrainFetcher::REFETCH_TEXTURE));
-                    else
-                        mTileCache->addTile(tile);
                     break;
                 case mgnTerrainFetcher::REFETCH_USER_DATA:
                     tile->freeUserObjects(); // free any allocated user objects to renew with new ones
@@ -543,6 +549,17 @@ namespace mgn {
                         tile->mUpdateUserData = true;
                 }
             }
+            if (mTerrainProvider.IsPassiveHighlightUpdateRequested())
+            {
+                mTerrainProvider.ClearPassiveHighlightUpdateRequests();
+                mTileCache->RequestPassiveHighlightUpdate();
+                for (TileMap::const_iterator it = ts.tileMap.begin(); it != ts.tileMap.end(); ++it)
+                {
+                    TerrainTile *tile = it->second;
+                    if (tile)
+                        tile->mUpdatePassiveHighlight = true;
+                }
+            }
 
             for (size_t keyind=0; keyind<ts.tileKeys.size(); ++keyind)
             {
@@ -595,17 +612,18 @@ namespace mgn {
                             tile->mUpdateUserData = false; // turn off flag
                             mFetcher->addCommandLow(mgnTerrainFetcher::CommandData(tile, mgnTerrainFetcher::REFETCH_USER_DATA));
                         }
+                        if (tile->mUpdatePassiveHighlight && !tile->mUpdatePassiveHighlightRequested)
+                        {
+                            tile->mUpdatePassiveHighlightRequested = true;
+                            tile->mUpdatePassiveHighlight = false;
+                            mFetcher->addCommandLow(mgnTerrainFetcher::CommandData(tile, mgnTerrainFetcher::FETCH_PASSIVE_HIGHLIGHT));
+                        }
 
                         renderer_->PushMatrix();
                         renderer_->Translate(tile->mPosition);
 
-                        // const bool use_fog = mTerrainView->useFog();
-                        // if (use_fog)
-                        //     context.enableFog( mTerrainView->getCamHeight(), mTerrainView->getZFar() );
                         tile->drawTileMesh(frustum, mTerrainShader);
                         tile->drawSegments(frustum);
-                        // if (use_fog)
-                        //     context.disableFog();
 
                         renderer_->PopMatrix();
 
@@ -895,6 +913,97 @@ namespace mgn {
             SelectedTrailsObtainer obtainer(context, const_cast<mgnMdTerrainProvider&>(mTerrainProvider), onLine);
             mFetcher->invoke(&obtainer);
             ids.swap(obtainer.ids);
+        }
+
+        void TerrainMap::GetSelectedPOIs(int x, int y, int radius, TMapObjectsVector& objects) const
+        {
+            mgnCriticalSectionScopedEntrance guard(const_cast<mgnCSHandle&>(mIconListCriticalSection));
+
+            vec2 selection_pos((float)x, (float)y);
+            float selection_radius = (float)radius;
+
+            // Icons are sorted from farest to nearest, but we need to select nearest ones
+            for (std::list<Icon*>::const_reverse_iterator it = mIconList.rbegin(); it != mIconList.rend(); ++it)
+            {
+                Icon * icon = *it;
+
+                if (!icon->isPOI()) continue;
+
+                // TODO: move following code to IconMesh class
+                const math::Matrix4& proj = renderer_->projection_matrix();
+                const math::Matrix4& view = renderer_->view_matrix();
+                const math::Vector4& viewport = renderer_->viewport();
+
+                vec4 icon_pos_world(icon->position() + icon->tile_position(), 1.0f);
+                vec4 icon_pos_eye = view * icon_pos_world;
+
+                vec2 icon_size;
+                icon->GetIconSize(icon_size);
+
+                vec4 vertices_eye[4];
+                switch (icon->getOrigin())
+                {
+                case Billboard::kBottomLeft:
+                    vertices_eye[0] = icon_pos_eye;
+                    break;
+                case Billboard::kBottomMiddle:
+                    vertices_eye[0] = icon_pos_eye;
+                    vertices_eye[0].x += -0.5f * icon_size.x;
+                    break;
+                default:
+                    assert(false);
+                    break;
+                }
+                vertices_eye[1] = vertices_eye[0];
+                vertices_eye[1].x += icon_size.x;
+                vertices_eye[2] = vertices_eye[0];
+                vertices_eye[2].x += icon_size.x;
+                vertices_eye[2].y -= icon_size.y; // sign "-" because of retarded view matrix (scale(1,-1,1))
+                vertices_eye[3] = vertices_eye[0];
+                vertices_eye[3].y -= icon_size.y;
+
+                vec2 vertices_screen[4];
+                for (int i = 0; i < 4; ++i)
+                {
+                    // Step 1: 4d Clip space
+                    vec4 pos_clip = proj * vertices_eye[i];
+
+                    // Step 2: 3d Normalized Device Coordinate space
+                    vec3 pos_ndc = pos_clip.xyz() / pos_clip.w;
+
+                    // Step 3: Window Coordinate space
+                    vertices_screen[i].x = (pos_ndc.x + 1.0f) * 0.5f * viewport.z + viewport.x;
+                    vertices_screen[i].y = (pos_ndc.y + 1.0f) * 0.5f * viewport.w + viewport.y;
+                }
+
+                if (math::CircleRectIntersection2D(selection_pos, selection_radius, vertices_screen))
+                {
+                    // Intersection detected
+                    objects.push_back(new mgnMdMapObjectInfo(icon->getMapObjectInfo()));
+                }
+            }
+        }
+        void TerrainMap::UpdatePOISelection(const std::vector<int>& selection)
+        {
+            class POISelectionCaller : public mgnTerrainFetcher::ICallable {
+            public:
+                POISelectionCaller(mgnMdTerrainProvider& provider, const std::vector<int>& selection)
+                    : provider_(provider)
+                    , selection_(selection) // copy vector
+                {
+                }
+
+                void call() // overrides pure virtual function
+                {
+                    provider_.UpdatePOISelection(selection_);
+                    provider_.AddUserDataUpdateRequest();
+                }
+
+                mgnMdTerrainProvider& provider_;
+                std::vector<int> selection_;
+            };
+            POISelectionCaller caller(const_cast<mgnMdTerrainProvider&>(mTerrainProvider), selection);
+            mFetcher->invoke(&caller);
         }
 
     } // namespace terrain

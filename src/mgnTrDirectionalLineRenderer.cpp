@@ -5,12 +5,29 @@
 
 #include <assert.h>
 
+static inline int MakeIntColorFrom565(mgnU16_t color565)
+{
+    int r5 = (color565 >> 11) & 0x1f;
+    int g6 = (color565 >> 5 ) & 0x3f;
+    int b5 = (color565      ) & 0x1f;
+    // Expand to 8 bits per channel, fill LSB with MSB
+    int r = r5 * 255 / 31;
+    int g = g6 * 255 / 63;
+    int b = b5 * 255 / 31;
+    int a = 0xff;
+    // Pack 4 8 bit channels into 32 bit pixel
+    int bgra = (b << 16) | (g << 8) | (r) | (a << 24);
+    return bgra;
+}
+
 namespace mgn {
     namespace terrain {
 
         DirectionalLineRenderer::DirectionalLineRenderer(graphics::Renderer * renderer, mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * provider,
                         graphics::Shader * shader, const mgnMdWorldPosition * gps_pos)
         : DottedLineRenderer(renderer, terrain_view, provider, shader, gps_pos)
+        , mColor(0xffaaaaaa)
+        , mFetchedColor(0xffaaaaaa)
         {
         }
         DirectionalLineRenderer::~DirectionalLineRenderer()
@@ -205,7 +222,7 @@ namespace mgn {
         }
         void DirectionalLineRenderer::render(const math::Frustum& frustum)
         {
-            if (!texture_)
+            if (!texture_ || mColor != mFetchedColor)
                 createTexture();
 
             renderer_->ChangeVertexFormat(vertex_format_);
@@ -319,8 +336,10 @@ namespace mgn {
         }
         void DirectionalLineRenderer::createTexture()
         {
-            int color = 0xffaaaaaa;
-            unsigned char* data = reinterpret_cast<unsigned char*>(&color);
+            if (texture_)
+                renderer_->DeleteTexture(texture_);
+            mColor = mFetchedColor;
+            unsigned char* data = reinterpret_cast<unsigned char*>(&mColor);
             renderer_->CreateTextureFromData(texture_, 1, 1,
                 graphics::Image::Format::kRGBA8, graphics::Texture::Filter::kTrilinear, data);
         }
@@ -364,8 +383,8 @@ namespace mgn {
                             start_line->mBegin.world.point.mLatitude = mGpsPosition.mLatitude;
                             start_line->mBegin.world.point.mLongitude = mGpsPosition.mLongitude;
                             // Fix end point of segment and then crop it
-                            start_line->mEnd.world.point.mLatitude = offroad.start_line[1].mLatitude;
-                            start_line->mEnd.world.point.mLongitude = offroad.start_line[1].mLongitude;
+                            start_line->mEnd.world.point.mLatitude = offroad.start_line.end.mLatitude;
+                            start_line->mEnd.world.point.mLongitude = offroad.start_line.end.mLongitude;
                             onAddSegment(start_line);
 
                             DottedLineSegment *& cropped_start_line = mCroppedSegments.front();
@@ -389,8 +408,8 @@ namespace mgn {
                             dest_line->mBegin.world.point.mLatitude = mGpsPosition.mLatitude;
                             dest_line->mBegin.world.point.mLongitude = mGpsPosition.mLongitude;
                             // Fix end point of segment and then crop it
-                            dest_line->mEnd.world.point.mLatitude = offroad.dest_line[1].mLatitude;
-                            dest_line->mEnd.world.point.mLongitude = offroad.dest_line[1].mLongitude;
+                            dest_line->mEnd.world.point.mLatitude = offroad.dest_line.end.mLatitude;
+                            dest_line->mEnd.world.point.mLongitude = offroad.dest_line.end.mLongitude;
                             onAddSegment(dest_line);
 
                             DottedLineSegment *& cropped_dest_line = mCroppedSegments.back();
@@ -405,15 +424,17 @@ namespace mgn {
             if (need_load_segments)
             {
                 // Load start line
-                if (offroad.start_line.empty())
+                if (offroad.start_line.empty)
                 {
                     mSegments.push_back(NULL);
                     mCroppedSegments.push_back(NULL);
                 }
                 else // start line exists
                 {
+                    mFetchedColor = MakeIntColorFrom565(offroad.start_line.color);
+
                     DottedLineSegment * segment = new DottedLineSegment(
-                        offroad.start_line[0], offroad.start_line[1]);
+                        offroad.start_line.begin, offroad.start_line.end);
                     onAddSegment(segment);
                     mSegments.push_back(segment);
 
@@ -423,15 +444,17 @@ namespace mgn {
                     mCroppedSegments.push_back(cropped_segment);
                 }
                 // Load dest line
-                if (offroad.dest_line.empty())
+                if (offroad.dest_line.empty)
                 {
                     mSegments.push_back(NULL);
                     mCroppedSegments.push_back(NULL);
                 }
                 else // dest line exists
                 {
+                    mFetchedColor = MakeIntColorFrom565(offroad.dest_line.color);
+
                     DottedLineSegment * segment = new DottedLineSegment(
-                        offroad.dest_line[0], offroad.dest_line[1]);
+                        offroad.dest_line.begin, offroad.dest_line.end);
                     onAddSegment(segment);
                     mSegments.push_back(segment);
 

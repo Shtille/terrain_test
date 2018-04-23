@@ -44,6 +44,9 @@ namespace mgn {
 
             //! Refresh all user data in cache
             void RequestUserDataUpdate();
+
+            //! Refresh all passive highlight in cache
+            void RequestPassiveHighlightUpdate();
         };
 
     } // namespace terrain

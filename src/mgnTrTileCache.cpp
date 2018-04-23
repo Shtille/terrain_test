@@ -105,6 +105,15 @@ namespace mgn {
                     tile->mUpdateUserData = true;
             }
         }
+        void TileCache::RequestPassiveHighlightUpdate()
+        {
+            for (TileMap::iterator it = mTiles.begin(); it != mTiles.end(); ++it)
+            {
+                TerrainTile *tile = it->second;
+                if (tile)
+                    tile->mUpdatePassiveHighlight = true;
+            }
+        }
 
     } // namespace terrain
 } // namespace mgn

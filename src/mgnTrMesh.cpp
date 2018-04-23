@@ -1,7 +1,5 @@
 #include "mgnTrMesh.h"
 
-#include <assert.h>
-
 namespace mgn {
     namespace terrain {
         
@@ -16,6 +14,7 @@ namespace mgn {
         , vertex_format_(NULL)
         , vertex_buffer_(NULL)
         , index_buffer_(NULL)
+        , can_render_(false)
         {
             
         }
@@ -58,14 +57,15 @@ namespace mgn {
             if (index_buffer_ == NULL) return false;
             
             FreeArrays();
+
+            can_render_ = true;
             
             return true;
         }
         void Mesh::Render()
         {
-            assert(vertex_format_ != NULL);
-            assert(vertex_buffer_ != NULL);
-            assert(index_buffer_ != NULL);
+            if (!can_render_)
+                return;
 
             renderer_->ChangeVertexFormat(vertex_format_);
             renderer_->ChangeVertexBuffer(vertex_buffer_);

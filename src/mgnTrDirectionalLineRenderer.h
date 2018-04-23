@@ -33,6 +33,8 @@ namespace mgn {
             void doFetch();
 
             std::list<DottedLineSegment*> mCroppedSegments;
+            int mColor;
+            int mFetchedColor;
 
         private:
 

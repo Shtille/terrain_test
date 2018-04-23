@@ -30,9 +30,8 @@ namespace mgn {
 
     class TimeManager {
     public:
-        static void CreateInstance();
-        static void DestroyInstance();
-        static TimeManager * GetInstance();
+        TimeManager();
+        ~TimeManager();
 
         void Update();
 
@@ -44,9 +43,6 @@ namespace mgn {
         float GetFrameRate() const; //!< returns number of frames per second (FPS)
 
     private:
-        TimeManager();
-        ~TimeManager();
-        static TimeManager * mInstance;
 
         mgnU32_t mLastTime;
         mgnU32_t mFrameTime; //!< also known as "frame time"

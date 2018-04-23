@@ -76,6 +76,8 @@ namespace mgn {
             bool mUpdateTextureRequested;
             bool mUpdateUserData;
             bool mUpdateUserDataRequested;
+            bool mUpdatePassiveHighlight;
+            bool mUpdatePassiveHighlightRequested;
 
             // Data which will be shared between several threads (fetching and displaying)
             std::vector<unsigned char>          mTextureData;
@@ -83,6 +85,7 @@ namespace mgn {
             std::vector<PointUserObjectInfo>    mPointUserObjects;
 
             SolidLineChunk * mHighlightTrackChunk;
+            SolidLineChunk * mPassiveHighlightTrackChunk;
 
             math::BoundingBox mBoundingBox;
 
@@ -92,6 +95,7 @@ namespace mgn {
 
             void updateTracks(); // this function is called every frame
             void fetchTracks(); // called in other thread
+            void fetchPassiveHighlight();
             void calcBoundingBox();
 
             TerrainTile(const TerrainMap *owner, const mgnTileKey &key, GeoSquare geoSquare, float gx, float gy);

@@ -515,6 +515,9 @@ namespace mgn {
                 const double kDivisionStepMeters = elementStep();
                 const double division_step = kDivisionStepMeters / terrain_view_->getMetersPerLatitude();
 
+                const int kMaxRenderedPoints = 1000;
+                int rendered_points = 0;
+
                 DottedLineSegment * prev_segment = NULL;
 
                 for (std::list<DottedLineSegment*>::iterator it = mSegments.begin();
@@ -576,7 +579,7 @@ namespace mgn {
 
                     double offset = (prev_segment) ? prev_segment->mOffset : 0.0;
                     int num_points = (int)((len - offset) / division_step);
-                    //num_points = std::min(num_points, maxRenderedPointsPerSegment());
+                    num_points = std::min(num_points, maxRenderedPointsPerSegment());
 
                     // Then render all points
                     for (int i = 0; i <= num_points; ++i)
@@ -586,6 +589,7 @@ namespace mgn {
                             --skipping;
                             continue;
                         }
+                        ++rendered_points;
                         skipping = skipping_current;
                         double cur_len = i * division_step + offset;
                         DottedLinePointInfo point;
@@ -606,6 +610,8 @@ namespace mgn {
                         renderer_->DrawElements(graphics::PrimitiveType::kTriangleStrip);
                         renderer_->PopMatrix();
                     }
+                    if (rendered_points >= kMaxRenderedPoints)
+                        break;
                     prev_segment = segment;
                 }
             }

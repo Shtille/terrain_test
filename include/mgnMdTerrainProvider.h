@@ -4,6 +4,7 @@
 #include "mgnBaseType.h"
 #include "mgnMdWorldPoint.h"
 #include "mgnMdWorldRect.h"
+#include "mgnMdMapObjectInfo.h"
 
 #include <vector>
 #include <string>
@@ -82,14 +83,19 @@ struct PointUserObjectInfo
     double alt;
 
     int id; //!< ID of user data object (need for selection)
+    mgnMdMapObjectInfo poi_info;
 
+    bool is_poi;
     bool centered;
+    unsigned char user_data_index;
 
     // bitmap
     const mgnMdBitmap *bmp;
 
     // texture size. It should be 2^N
     size_t tex_w, tex_h;
+
+    size_t hash() { return reinterpret_cast<size_t>(bmp) + static_cast<size_t>(user_data_index); }
 };
 
 struct GeoState
@@ -207,11 +213,17 @@ struct GeoHighlight
 
 struct GeoOffroad
 {
-    std::vector<mgnMdWorldPoint> start_line;
-    std::vector<mgnMdWorldPoint> dest_line;
+    struct Line {
+        mgnMdWorldPoint begin;
+        mgnMdWorldPoint end;
+        mgnU16_t color; // 565 color
+        bool empty;
+    };
+    Line start_line;
+    Line dest_line;
     char phase; //!< 0 - unknown, 1 - on start line, 2 - on road, 3 - on dest line
     // If we have highlight we always have start line and dest line
-    bool exist() { return !start_line.empty() || !dest_line.empty(); }
+    bool exist() { return !start_line.empty || !dest_line.empty; }
 };
 
 /*! Service struct for obtaining maneuver data */
@@ -262,7 +274,10 @@ public:
     virtual void fetchWater(GeoSquare& /*clipRect*/, GeoLakes& /*result*/){}
 
     virtual void fetchHighlight(const mgnMdIUserDataDrawContext& /*contextGeo*/, GeoHighlight& /*highlight*/) {}
-    virtual bool fetchNeedToTrimHighlight() { return false; }
+    virtual void fetchPassiveHighlight(const mgnMdIUserDataDrawContext &context, GeoHighlight& highlight) {}
+    virtual int fetcHighlightPointCount(const mgnMdIUserDataDrawContext &context) { return 0; }
+    virtual bool fetchHighlightCutPoint(const mgnMdIUserDataDrawContext &context, mgnMdWorldPoint & point) {return false;}
+    virtual float fetchHighlightWidth(int map_scale) { return 0.0f; }
     virtual bool isHighlightExist() { return false; }
     virtual int  dequeueHighlightMessage() { return GeoHighlight::kNoMessages; }
     virtual void reformHighlightMessages() {}
@@ -301,6 +316,11 @@ public:
     virtual void AddUserDataUpdateRequest() {}
     virtual bool IsUserDataUpdateRequested() {return false;}
     virtual void ClearUserDataUpdateRequests() {}
+
+    virtual bool IsPassiveHighlightUpdateRequested() {return false;}
+    virtual void ClearPassiveHighlightUpdateRequests() {}
+
+    virtual void UpdatePOISelection(const std::vector<int>& selection) {}
 };
 
 #endif

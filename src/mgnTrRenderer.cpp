@@ -1,6 +1,5 @@
 #include "mgnTrRenderer.h"
 
-#include "mgnTrFakeTerrain.h"
 #include "mgnTrVehicleRenderer.h"
 #include "mgnTrGpsMmPositionRenderer.h"
 #include "mgnTrRouteBeginRenderer.h"
@@ -10,6 +9,7 @@
 #include "mgnTrDirectionalLineRenderer.h"
 #include "mgnTrActiveTrackRenderer.h"
 #include "mgnTrHighlightTrackRenderer.h"
+#include "mgnTrPassiveHighlightTrackRenderer.h"
 #include "mgnTrTerrainMap.h"
 
 #include "mgnMdTerrainView.h"
@@ -68,7 +68,7 @@ namespace mgn {
         // At first we must initialize shaders to use it further
         LoadShaders();
 
-        mgn::TimeManager::CreateInstance();
+        mTimeManager = new mgn::TimeManager();
 
 #ifndef MGNTR_MERCATOR_TILE
         mVehicleRenderer = new VehicleRenderer(renderer, terrain_view,
@@ -81,7 +81,9 @@ namespace mgn {
         mActiveTrackRenderer = new ActiveTrackRenderer(renderer, terrain_view, terrain_provider,
             mPositionTexcoordShader, mVehicleRenderer->GetPosPtr());
         mHighlightTrackRenderer = new HighlightTrackRenderer(renderer, terrain_view, terrain_provider,
-            mPositionShader, mVehicleRenderer->GetPosPtr(), mTerrainMap->getFetcherPtr());
+            mPositionShader, mVehicleRenderer->GetPosPtr(), mTerrainMap->getFetcherPtr(), mTimeManager);
+        mPassiveHighlightTrackRenderer = new PassiveHighlightTrackRenderer(renderer, terrain_view, terrain_provider,
+            mPositionShader, mVehicleRenderer->GetPosPtr(), mTerrainMap->getFetcherPtr(), mTimeManager);
         mTerrainMap->setHighlightRenderer( mHighlightTrackRenderer );
         mGuidanceArrowRenderer = new GuidanceArrowRenderer(renderer, terrain_view,
             mPositionShader, mVehicleRenderer->GetPosPtr());
@@ -93,7 +95,9 @@ namespace mgn {
             mPositionNormalShader);
         mGpsMmPositionRenderer = new GpsMmPositionRenderer(renderer, terrain_view,
             mPositionNormalShader);
-        mFakeTerrain = new FakeTerrain(renderer, mPositionShader);
+
+        mTerrainMap->setHighlightRenderer( mHighlightTrackRenderer );
+        mTerrainMap->setPassiveHighlightRenderer(mPassiveHighlightTrackRenderer);
 #else
         mMercatorTree = new MercatorTree(renderer, mMercatorTileShader, &mFrustum, terrain_view,
             mercator_provider);
@@ -101,7 +105,7 @@ namespace mgn {
 #endif
 
 #ifdef COUNT_PERFORMANCE
-        s_timer = mgn::TimeManager::GetInstance()->AddTimer(1000);
+        s_timer = mTimeManager->AddTimer(1000);
         s_timer->Start();
 #endif
 
@@ -118,13 +122,11 @@ namespace mgn {
     Renderer::~Renderer()
     {
 #ifdef COUNT_PERFORMANCE
-        mgn::TimeManager::GetInstance()->RemoveTimer(s_timer);
+        mTimeManager->RemoveTimer(s_timer);
 #endif
 #ifdef MGNTR_MERCATOR_TILE
         delete mMercatorTree;
-#else
-        delete mFakeTerrain;
-        delete mGpsMmPositionRenderer;
+#else        delete mGpsMmPositionRenderer;
         delete mRouteEndRenderer;
         delete mRouteBeginRenderer;
         delete mManeuverRenderer;
@@ -132,11 +134,12 @@ namespace mgn {
         delete mActiveTrackRenderer;
         delete mDirectionalLineRenderer;
         delete mTerrainMap;
+        delete mPassiveHighlightTrackRenderer;
         delete mHighlightTrackRenderer; // should be deleted after TerrainMap
         delete mVehicleRenderer;
 #endif
 
-        mgn::TimeManager::DestroyInstance();
+        delete mTimeManager;
     }
     void Renderer::Update()
     {
@@ -147,13 +150,13 @@ namespace mgn {
         mProjectionViewMatrix = mRenderer->projection_matrix() * mRenderer->view_matrix();
         mFrustum.Load(mProjectionViewMatrix);
 
-        mgn::TimeManager::GetInstance()->Update();
+        mTimeManager->Update();
 
 #ifdef COUNT_PERFORMANCE
         if (s_timer->HasExpired())
         {
             s_timer->Reset();
-            LOG_INFO(0, ("FPS: %.2f", mgn::TimeManager::GetInstance()->GetFrameRate()));
+            LOG_INFO(0, ("FPS: %.2f", mTimeManager->GetFrameRate()));
         }
 #endif
 
@@ -162,6 +165,7 @@ namespace mgn {
         mDirectionalLineRenderer->update(mFrustum);
         mActiveTrackRenderer->update(mFrustum);
         mHighlightTrackRenderer->update();
+        mPassiveHighlightTrackRenderer->update();
         mRouteBeginRenderer->Update(mTerrainProvider);
         mRouteEndRenderer->Update(mTerrainProvider);
         mGpsMmPositionRenderer->Update(mTerrainProvider);
@@ -188,15 +192,7 @@ namespace mgn {
         mRenderer->ClearColor(0.5f, 0.6f, 0.8f, 1.0f);
         mRenderer->ClearColorAndDepthBuffers();
 
-#ifndef MGNTR_MERCATOR_TILE
-        if (mTerrainMap->shouldRenderFakeTerrain())
-        {
-            mFakeTerrain->Render(mVehicleRenderer->GetCenter().y - mVehicleRenderer->GetSize(),
-                (float)mTerrainView->getCellSizeLon(mTerrainView->getMagIndex()+5),
-                (float)mTerrainView->getCellSizeLat(mTerrainView->getMagIndex()+5));
-        }
-
-        mTerrainMap->render(mFrustum);
+#ifndef MGNTR_MERCATOR_TILE        mTerrainMap->render(mFrustum);
 
         mDirectionalLineRenderer->render(mFrustum);
         mActiveTrackRenderer->render(mFrustum);
@@ -245,6 +241,7 @@ namespace mgn {
         mDirectionalLineRenderer->onViewChange();
         mActiveTrackRenderer->onViewChange();
         mHighlightTrackRenderer->onViewChange();
+        mPassiveHighlightTrackRenderer->onViewChange();
         mTerrainMap->updateIconList();
         // Inform online raster maps manager about new world rect
         mgnMdWorldRect world_rect = mTerrainView->getLowDetailWorldRect();
@@ -422,29 +419,26 @@ namespace mgn {
     {
 #ifndef MGNTR_MERCATOR_TILE
         const bool use_fog = mTerrainView->useFog();
-        const int fog_value = (use_fog) ? 1 : 0;
+        const float fog_modifier = (use_fog) ? 1.0f : 0.0f;
         const float zfar = mTerrainView->getZFar();
 
         mPositionShader->Bind();
         mPositionShader->UniformMatrix4fv("u_projection", mRenderer->projection_matrix());
         mPositionShader->UniformMatrix4fv("u_view", mRenderer->view_matrix());
-        mPositionShader->Uniform1i("u_fog_enabled", fog_value);
-        if (use_fog)
-            mPositionShader->Uniform1f("u_z_far", zfar);
+        mPositionShader->Uniform1f("u_fog_modifier", fog_modifier);
+        mPositionShader->Uniform1f("u_z_far", zfar);
 
         mPositionNormalShader->Bind();
         mPositionNormalShader->UniformMatrix4fv("u_projection", mRenderer->projection_matrix());
         mPositionNormalShader->UniformMatrix4fv("u_view", mRenderer->view_matrix());
-        mPositionNormalShader->Uniform1i("u_fog_enabled", fog_value);
-        if (use_fog)
-            mPositionNormalShader->Uniform1f("u_z_far", zfar);
+        mPositionNormalShader->Uniform1f("u_fog_modifier", fog_modifier);
+        mPositionNormalShader->Uniform1f("u_z_far", zfar);
 
         mPositionTexcoordShader->Bind();
         mPositionTexcoordShader->UniformMatrix4fv("u_projection", mRenderer->projection_matrix());
         mPositionTexcoordShader->UniformMatrix4fv("u_view", mRenderer->view_matrix());
-        mPositionTexcoordShader->Uniform1i("u_fog_enabled", fog_value);
-        if (use_fog)
-            mPositionTexcoordShader->Uniform1f("u_z_far", zfar);
+        mPositionTexcoordShader->Uniform1f("u_fog_modifier", fog_modifier);
+        mPositionTexcoordShader->Uniform1f("u_z_far", zfar);
 
         mPositionShadeTexcoordShader->Bind();
         mPositionShadeTexcoordShader->UniformMatrix4fv("u_projection_view", mProjectionViewMatrix);
@@ -453,9 +447,8 @@ namespace mgn {
         mBillboardShader->Bind();
         mBillboardShader->UniformMatrix4fv("u_projection", mRenderer->projection_matrix());
         mBillboardShader->UniformMatrix4fv("u_view", mRenderer->view_matrix());
-        mBillboardShader->Uniform1i("u_fog_enabled", (use_fog) ? 1 : 0);
-        if (use_fog)
-            mBillboardShader->Uniform1f("u_z_far", mTerrainView->getZFar());
+        mBillboardShader->Uniform1f("u_fog_modifier", fog_modifier);
+        mBillboardShader->Uniform1f("u_z_far", zfar);
 
         if (use_fog)
         {
@@ -487,6 +480,7 @@ namespace mgn {
         mDirectionalLineRenderer->onGpsPositionChange();
         mActiveTrackRenderer->onGpsPositionChange();
         mHighlightTrackRenderer->onGpsPositionChange(lat, lon);
+        mPassiveHighlightTrackRenderer->onGpsPositionChange(lat, lon);
 #endif
     }
     void Renderer::IntersectionWithRay(const math::Vector3& ray, math::Vector3& intersection) const
@@ -509,6 +503,18 @@ namespace mgn {
     {
 #ifndef MGNTR_MERCATOR_TILE
         mTerrainMap->GetSelectedTrails(x, mSizeY - y, radius, online, ids);
+#endif
+    }
+    void Renderer::GetSelectedPOIs(int x, int y, int radius, TMapObjectsVector& objects) const
+    {
+#ifndef MGNTR_MERCATOR_TILE
+        mTerrainMap->GetSelectedPOIs(x, mSizeY - y, radius, objects);
+#endif
+    }
+    void Renderer::UpdatePOISelection(const std::vector<int>& selection)
+    {
+#ifndef MGNTR_MERCATOR_TILE
+        mTerrainMap->UpdatePOISelection(selection);
 #endif
     }
 

@@ -22,6 +22,7 @@ namespace mgn {
                 FETCH_TEXTURE,
                 FETCH_USER_DATA,
                 UPDATE_TRACKS,
+                FETCH_PASSIVE_HIGHLIGHT,
                 REFETCH_TEXTURE, // has lowest priority
                 REFETCH_USER_DATA, // has lowest priority
 

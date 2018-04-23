@@ -3,6 +3,7 @@
 #define __MGN_TERRAIN_ICON_H__
 
 #include "mgnTrBillboard.h"
+#include "mgnMdMapObjectInfo.h"
 
 struct PointUserObjectInfo;
 
@@ -20,11 +21,15 @@ namespace mgn {
 
             void GetIconSize(vec2& size);
             int getID() const;
+            const mgnMdMapObjectInfo& getMapObjectInfo() const;
+            bool isPOI() const;
 
         private:
             void Create(const PointUserObjectInfo &pui, unsigned short magIndex);
 
             int mID; //!< icon ID for selection
+            mgnMdMapObjectInfo mMapObjectInfo; //!< map object info for POI
+            bool mIsPOI;
         };
 
     } // namespace terrain
