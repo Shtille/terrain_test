@@ -40,6 +40,7 @@ namespace mgn {
         class TerrainMap;
         class MercatorTree;
         class MercatorProvider;
+        class Font;
 
         // Main class for rendering
         class Renderer {
@@ -101,6 +102,7 @@ namespace mgn {
             GpsMmPositionRenderer * mGpsMmPositionRenderer;
             VehicleRenderer * mVehicleRenderer;
 
+            Font * mFont;
             MercatorTree * mMercatorTree;
 
             graphics::Shader * mPositionShader;

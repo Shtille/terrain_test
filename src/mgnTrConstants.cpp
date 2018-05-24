@@ -11,6 +11,14 @@ namespace mgn {
         {
             return 31;
         }
+        int GetMaxLod()
+        {
+            return 22;
+        }
+        int GetMapSizeMax()
+        {
+            return GetTileResolution() << GetMaxLod();
+        }
         const float GetHeightMin()
         {
             return -1000.0f;

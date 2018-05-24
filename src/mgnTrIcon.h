@@ -14,7 +14,7 @@ namespace mgn {
         class Icon : public Billboard {
         public:
             explicit Icon(mgn::graphics::Renderer * renderer, mgnMdTerrainView * terrain_view,
-                graphics::Shader * shader, const vec3* tile_position, const PointUserObjectInfo &pui, unsigned short magIndex);
+                graphics::Shader * shader, const PointUserObjectInfo &pui, unsigned short magIndex);
             virtual ~Icon();
 
             void render();

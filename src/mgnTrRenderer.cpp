@@ -1,5 +1,8 @@
 #include "mgnTrRenderer.h"
 
+#define MGNTR_MERCATOR_TILE
+
+#ifndef MGNTR_MERCATOR_TILE
 #include "mgnTrVehicleRenderer.h"
 #include "mgnTrGpsMmPositionRenderer.h"
 #include "mgnTrRouteBeginRenderer.h"
@@ -11,6 +14,8 @@
 #include "mgnTrHighlightTrackRenderer.h"
 #include "mgnTrPassiveHighlightTrackRenderer.h"
 #include "mgnTrTerrainMap.h"
+#endif
+#include "mgnTrFontAtlas.h"
 
 #include "mgnMdTerrainView.h"
 #include "mgnTimeManager.h"
@@ -30,7 +35,7 @@
 #include "shaders/mgnTrBillboardShaderSource.h"
 #include "shaders/mgnTrMercatorTileShaderSource.h"
 
-#define MGNTR_MERCATOR_TILE
+
 
 #ifdef MGNTR_MERCATOR_TILE
 #include "mgnTrConstants.h"
@@ -68,7 +73,16 @@ namespace mgn {
         // At first we must initialize shaders to use it further
         LoadShaders();
 
+        // Set projection matrix from terrain view's fovx value
+        UpdateProjectionMatrix();
+
         mTimeManager = new mgn::TimeManager();
+
+        // Sizes taken from RenderToolManagerGL.cpp
+        const int size3 = static_cast<int>(18.0f /** pixel_scale*/ + 0.5f);
+        const int border = static_cast<int>(3.0f /*+ pixel_scale*/ + 0.5f);
+        mFont = Font::CreateWithBorder(renderer, font_path, size3, border,
+            Color(0.0f, 0.0f, 0.0f), Color(1.0f, 1.0f, 1.0f), pixel_scale);
 
 #ifndef MGNTR_MERCATOR_TILE
         mVehicleRenderer = new VehicleRenderer(renderer, terrain_view,
@@ -99,20 +113,14 @@ namespace mgn {
         mTerrainMap->setHighlightRenderer( mHighlightTrackRenderer );
         mTerrainMap->setPassiveHighlightRenderer(mPassiveHighlightTrackRenderer);
 #else
-        mMercatorTree = new MercatorTree(renderer, mMercatorTileShader, &mFrustum, terrain_view,
-            mercator_provider);
-        mMercatorTree->Initialize();
+        mMercatorTree = new MercatorTree(renderer, mMercatorTileShader, mBillboardShader, mFont,
+            &mFrustum, terrain_view, mercator_provider);
+        mMercatorTree->Initialize(mFovY, size_y);
 #endif
 
 #ifdef COUNT_PERFORMANCE
         s_timer = mTimeManager->AddTimer(1000);
         s_timer->Start();
-#endif
-
-        UpdateProjectionMatrix();
-
-#ifdef MGNTR_MERCATOR_TILE
-        mMercatorTree->SetParameters(mFovY, size_y);
 #endif
 
         // Update viewport manually on creation since owner doesn't do it
@@ -126,7 +134,8 @@ namespace mgn {
 #endif
 #ifdef MGNTR_MERCATOR_TILE
         delete mMercatorTree;
-#else        delete mGpsMmPositionRenderer;
+#else   
+        delete mGpsMmPositionRenderer;
         delete mRouteEndRenderer;
         delete mRouteBeginRenderer;
         delete mManeuverRenderer;
@@ -138,6 +147,7 @@ namespace mgn {
         delete mHighlightTrackRenderer; // should be deleted after TerrainMap
         delete mVehicleRenderer;
 #endif
+        delete mFont;
 
         delete mTimeManager;
     }
@@ -192,7 +202,8 @@ namespace mgn {
         mRenderer->ClearColor(0.5f, 0.6f, 0.8f, 1.0f);
         mRenderer->ClearColorAndDepthBuffers();
 
-#ifndef MGNTR_MERCATOR_TILE        mTerrainMap->render(mFrustum);
+#ifndef MGNTR_MERCATOR_TILE
+        mTerrainMap->render(mFrustum);
 
         mDirectionalLineRenderer->render(mFrustum);
         mActiveTrackRenderer->render(mFrustum);
@@ -220,7 +231,9 @@ namespace mgn {
 
         mVehicleRenderer->Render();
 #else
+        mRenderer->EnableBlend();
         mMercatorTree->Render();
+        mMercatorTree->RenderLabels();
 #endif
     }
     void Renderer::OnResize(int size_x, int size_y)
@@ -258,8 +271,9 @@ namespace mgn {
         float zfar = mTerrainView->getZFar();
         float znear = mTerrainView->getZNear();
 #ifdef MGNTR_MERCATOR_TILE
-        mTerrainView->LocalToPixelDistance(zfar, zfar, MercatorTree::GetMapSizeMax());
-        mTerrainView->LocalToPixelDistance(znear, znear, MercatorTree::GetMapSizeMax());
+        const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+        mTerrainView->LocalToPixelDistance(zfar, zfar, kMSM);
+        mTerrainView->LocalToPixelDistance(znear, znear, kMSM);
 #endif
         mFovX = mTerrainView->getFovX();
         mFovY = ((float)mSizeY / (float)mSizeX) * mFovX;
@@ -279,8 +293,9 @@ namespace mgn {
         float center_height = (float)mTerrainView->getCenterHeight();
 
 #ifdef MGNTR_MERCATOR_TILE
-        mTerrainView->LocalToPixelDistance(camera_distance, camera_distance, MercatorTree::GetMapSizeMax());
-        mTerrainView->LocalToPixelDistance(center_height, center_height, MercatorTree::GetMapSizeMax());
+        const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+        mTerrainView->LocalToPixelDistance(camera_distance, camera_distance, kMSM);
+        mTerrainView->LocalToPixelDistance(center_height, center_height, kMSM);
 #endif
 
         math::Matrix4 view_matrix;
@@ -309,8 +324,9 @@ namespace mgn {
 #ifndef MGNTR_MERCATOR_TILE
             view_matrix *= math::Translate(0.0f, -center_height, 0.0f);
 #else
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
             vec3 translation;
-            mTerrainView->PixelLocation(translation, MercatorTree::GetMapSizeMax());
+            mTerrainView->PixelLocation(translation, kMSM);
             view_matrix *= math::Translate(-translation.x, -center_height, -translation.z);
 #endif
         }
@@ -346,8 +362,9 @@ namespace mgn {
 #ifndef MGNTR_MERCATOR_TILE
             view_matrix *= math::Translate(0.0f, -center_height, 0.0f);
 #else
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
             vec3 translation;
-            mTerrainView->PixelLocation(translation, MercatorTree::GetMapSizeMax());
+            mTerrainView->PixelLocation(translation, kMSM);
             view_matrix *= math::Translate(-translation.x, -center_height, -translation.z);
 #endif
         }
@@ -355,7 +372,6 @@ namespace mgn {
     }
     void Renderer::LoadShaders()
     {
-#ifndef MGNTR_MERCATOR_TILE
         {
             const char * attribs[] = {"a_position"};
             mRenderer->AddShader(mPositionShader, kPositionVertexShaderSource, kPositionFragmentShaderSource, attribs, 1);
@@ -396,15 +412,15 @@ namespace mgn {
                 mBillboardShader->Unbind();
             }
         }
-#else
         {
             const char * attribs[] = {"a_position"};
             mRenderer->AddShader(mMercatorTileShader, kMercatorTileVertexShaderSource, kMercatorTileFragmentShaderSource, attribs, 1);
             if (mMercatorTileShader)
             {
-                float height_multiplier = MercatorTree::GetMapSizeMax() / 111111.0f / 360.0f;
+                const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+                float height_multiplier = kMSM / 111111.0f / 360.0f;
                 mMercatorTileShader->Bind();
-                mMercatorTileShader->Uniform1f("u_map_size_max", MercatorTree::GetMapSizeMax());
+                mMercatorTileShader->Uniform1f("u_map_size_max", kMSM);
                 mMercatorTileShader->Uniform1f("u_height_multiplier", height_multiplier);
                 mMercatorTileShader->Uniform1f("u_height_min", GetHeightMin());
                 mMercatorTileShader->Uniform1f("u_height_range", GetHeightRange());
@@ -413,14 +429,14 @@ namespace mgn {
                 mMercatorTileShader->Unbind();
             }
         }
-#endif
     }
     void Renderer::UpdateShaders()
     {
-#ifndef MGNTR_MERCATOR_TILE
+        const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
         const bool use_fog = mTerrainView->useFog();
         const float fog_modifier = (use_fog) ? 1.0f : 0.0f;
-        const float zfar = mTerrainView->getZFar();
+        float zfar = mTerrainView->getZFar();
+        mTerrainView->LocalToPixelDistance(zfar, zfar, kMSM);
 
         mPositionShader->Bind();
         mPositionShader->UniformMatrix4fv("u_projection", mRenderer->projection_matrix());
@@ -450,27 +466,26 @@ namespace mgn {
         mBillboardShader->Uniform1f("u_fog_modifier", fog_modifier);
         mBillboardShader->Uniform1f("u_z_far", zfar);
 
-        if (use_fog)
-        {
-            vec4 params;
-            float size = mVehicleRenderer->GetSize();
-            math::CalculateObjectOcclusionParams(mRenderer->projection_matrix(), mRenderer->view_matrix(),
-                mRenderer->viewport(), mVehicleRenderer->GetCenter(), size, params);
+        //if (use_fog)
+        //{
+        //    vec4 params;
+        //    float size = mVehicleRenderer->GetSize();
+        //    math::CalculateObjectOcclusionParams(mRenderer->projection_matrix(), mRenderer->view_matrix(),
+        //        mRenderer->viewport(), mVehicleRenderer->GetCenter(), size, params);
 
-            mBillboardShader->Uniform1i("u_occlusion_enabled", 1);
-            mBillboardShader->Uniform2f("u_occludee_params.center", params.x, params.y);
-            mBillboardShader->Uniform1f("u_occludee_params.radius", params.z);
-            mBillboardShader->Uniform1f("u_occludee_params.distance", params.w);
-            mBillboardShader->Uniform1f("u_occludee_params.size", size);
-        }
-        else
+        //    mBillboardShader->Uniform1i("u_occlusion_enabled", 1);
+        //    mBillboardShader->Uniform2f("u_occludee_params.center", params.x, params.y);
+        //    mBillboardShader->Uniform1f("u_occludee_params.radius", params.z);
+        //    mBillboardShader->Uniform1f("u_occludee_params.distance", params.w);
+        //    mBillboardShader->Uniform1f("u_occludee_params.size", size);
+        //}
+        //else
         {
             mBillboardShader->Uniform1i("u_occlusion_enabled", 0);
         }
-#else
+
         mMercatorTileShader->Bind();
         mMercatorTileShader->UniformMatrix4fv("u_projection_view_model", mProjectionViewMatrix);
-#endif
     }
     void Renderer::UpdateLocationIndicator(double lat, double lon, double altitude,
         double heading, double tilt,int color1, int color2)

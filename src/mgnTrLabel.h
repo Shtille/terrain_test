@@ -5,16 +5,16 @@
 #include "mgnTrBillboard.h"
 #include "mgnBaseType.h"
 
-struct LabelPositionInfo;
-
 namespace mgn {
     namespace terrain {
+
+        struct LabelData;
 
         //! class for rendering labels
         class Label : public Billboard {
         public:
             explicit Label(mgn::graphics::Renderer * renderer, mgnMdTerrainView * terrain_view,
-                graphics::Shader * shader, const vec3* tile_position, const LabelPositionInfo &lpi, unsigned short magIndex);
+                graphics::Shader * shader, const LabelData &data, int lod);
             virtual ~Label();
 
             const std::wstring& text() const;
@@ -23,7 +23,7 @@ namespace mgn {
             std::wstring mText; //!< text of label
 
         private:
-            void Create(const LabelPositionInfo &lpi, unsigned short magIndex);
+            void Create(const LabelData &data, int lod);
         };
 
     } // namespace terrain

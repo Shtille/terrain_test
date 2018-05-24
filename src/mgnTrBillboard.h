@@ -12,7 +12,7 @@ namespace mgn {
         class Billboard : protected Mesh {
         public:
             explicit Billboard(mgn::graphics::Renderer * renderer, mgnMdTerrainView * terrain_view,
-                graphics::Shader * shader, const vec3* tile_position, float scale);
+                graphics::Shader * shader, float scale);
             virtual ~Billboard();
 
             enum OriginType {
@@ -26,7 +26,6 @@ namespace mgn {
             virtual void GetIconSize(vec2& size);
 
             const vec3& position() const;
-            const vec3& tile_position() const;
             OriginType getOrigin() const; // need for selection icon id
 
         protected:
@@ -35,7 +34,6 @@ namespace mgn {
             graphics::Texture * mTexture;
 
             vec3 mPosition;     //!< 3D position in tile coord system
-            const vec3* mTilePosition; //!< tile position (icons offset in world space)
             float mScale;       //!< view dependent scale
             OriginType mOrigin; //!< type of icon origin
             float mWidth;

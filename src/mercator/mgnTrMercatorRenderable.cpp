@@ -22,7 +22,8 @@ namespace {
     }
     float MetersToPixelsHeight(float height)
     {
-        float height_multiplier = mgn::terrain::MercatorTree::GetMapSizeMax() / 111111.0f / 360.0f;
+        const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+        float height_multiplier = kMSM / 111111.0f / 360.0f;
         return height * height_multiplier;
     }
 }
@@ -154,7 +155,7 @@ namespace mgn {
 		void MercatorRenderable::AnalyzeTerrain()
 		{
 			const int grid_size = node_->owner_->grid_size();
-            const float fMapSizeMax = node_->owner_->GetMapSizeMax();
+            const float fMapSizeMax = static_cast<float>(mgn::terrain::GetMapSizeMax());
 
 			// Calculate scales, offsets for tile position on cube face.
 			const float inv_scale = 2.0f / (float)(1 << node_->lod_);

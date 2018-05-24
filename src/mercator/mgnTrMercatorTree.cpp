@@ -15,6 +15,8 @@
 
 #include "mgnMdTerrainView.h"
 
+#include "MapDrawing/Graphics/mgnCommonMath.h"
+
 #include <cmath>
 #include <cstddef>
 #include <assert.h>
@@ -28,11 +30,14 @@ namespace {
 namespace mgn {
     namespace terrain {
 
-        MercatorTree::MercatorTree(graphics::Renderer * renderer, graphics::Shader * shader,
-                math::Frustum * frustum, mgnMdTerrainView * terrain_view,
-                MercatorProvider * provider)
+        MercatorTree::MercatorTree(graphics::Renderer * renderer,
+            graphics::Shader * shader, graphics::Shader * billboard_shader, const Font * font,
+            math::Frustum * frustum, mgnMdTerrainView * terrain_view,
+            MercatorProvider * provider)
         : renderer_(renderer)
         , shader_(shader)
+        , billboard_shader_(billboard_shader)
+        , font_(font)
         , frustum_(frustum)
         , terrain_view_(terrain_view)
         , provider_(provider)
@@ -51,7 +56,8 @@ namespace mgn {
             service_ = new MercatorService();
 
             const float kPlanetRadius = 6371000.0f;
-            terrain_view->LocalToPixelDistance(kPlanetRadius, earth_radius_, GetMapSizeMax());
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+            terrain_view->LocalToPixelDistance(kPlanetRadius, earth_radius_, kMSM);
 
 #ifdef DEBUG
             debug_info_.num_nodes = 1;
@@ -70,6 +76,24 @@ namespace mgn {
             delete tile_;
             tile_ = NULL;
 
+            // Clear texture caches
+            for (IconTextureCache::iterator it = icon_texture_cache_.begin(); it != icon_texture_cache_.end(); ++it)
+            {
+                graphics::Texture * texture = it->second;
+                if (texture)
+                    renderer_->DeleteTexture(texture);
+            }
+            icon_texture_cache_.clear();
+
+            for (ShieldTextureCache::iterator it = shield_texture_cache_.begin(); it != shield_texture_cache_.end(); ++it)
+            {
+                graphics::Texture * texture = it->second;
+                if (texture)
+                    renderer_->DeleteTexture(texture);
+            }
+            shield_texture_cache_.clear();
+
+            // Delete default textures
             if (default_albedo_texture_)
             {
                 renderer_->DeleteTexture(default_albedo_texture_);
@@ -85,7 +109,7 @@ namespace mgn {
             delete service_; // should be deleted after faces are done
             service_ = NULL;
         }
-        bool MercatorTree::Initialize()
+        bool MercatorTree::Initialize(float fovy_in_radians, int screen_height)
         {
             // Create tile mesh
             tile_->Create();
@@ -116,26 +140,27 @@ namespace mgn {
             }
             // Run service
             service_->RunService();
+            // Setup LOD parameters
+            {
+                float fov = 2.0f * tan(0.5f * fovy_in_radians);
+
+                float geo_detail = std::max(1.0f, kGeoDetail);
+                lod_params_.geo_factor = screen_height / (geo_detail * fov);
+
+                float tex_detail = std::max(1.0f, kTexDetail);
+                lod_params_.tex_factor = screen_height / (tex_detail * fov);
+            }
+            // Create font for labels rendering
             return true;
-        }
-        void MercatorTree::SetParameters(float fovy_in_radians, int screen_height)
-        {
-            float fov = 2.0f * tan(0.5f * fovy_in_radians);
-
-            float geo_detail = std::max(1.0f, kGeoDetail);
-            lod_params_.geo_factor = screen_height / (geo_detail * fov);
-
-            float tex_detail = std::max(1.0f, kTexDetail);
-            lod_params_.tex_factor = screen_height / (tex_detail * fov);
         }
         void MercatorTree::Update()
         {
             // Update LOD state.
             if (!lod_freeze_)
             {
+                const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
                 vec3 cam_position_pixel;
-                terrain_view_->LocalToPixel(terrain_view_->getCamPosition(), cam_position_pixel,
-                    MercatorTree::GetMapSizeMax());
+                terrain_view_->LocalToPixel(terrain_view_->getCamPosition(), cam_position_pixel, kMSM);
                 lod_params_.camera_position = cam_position_pixel;
                 lod_params_.camera_front = frustum_->getDir();
             }
@@ -161,12 +186,41 @@ namespace mgn {
         }
         void MercatorTree::Render()
         {
+            rendered_nodes_.clear();
+
             shader_->Bind();
             if (root_->WillRender())
                 root_->Render();
             shader_->Unbind();
 
             ++frame_counter_;
+        }
+        void MercatorTree::RenderLabels()
+        {
+            renderer_->DisableDepthTest();
+
+            billboard_shader_->Bind();
+
+            // Draw labels
+            used_labels_.clear();
+            label_bounding_boxes_.clear();
+            for (std::vector<MercatorNode*>::const_iterator it = rendered_nodes_.begin();
+                it != rendered_nodes_.end(); ++it)
+            {
+                MercatorNode * node = *it;
+                if (node->lod_ == terrain_view_->GetLod())
+                    node->RenderLabels();
+            }
+            // Draw point user meshes
+            // for (std::list<Icon*>::iterator it = icons_list_.begin(); it != icons_list_.end(); ++it)
+            // {
+            //     Icon* icon = *it;
+            //     icon->render();
+            // }
+
+            billboard_shader_->Unbind();
+
+            renderer_->EnableDepthTest();
         }
         void MercatorTree::SplitQuadTreeNode(MercatorNode* node)
         {
@@ -313,7 +367,7 @@ namespace mgn {
         bool MercatorTree::HandleRenderable(MercatorNode* node)
         {
             // Determine max relative LOD depth between grid and tile
-            int maxLODRatio = (GetTextureSize() - 1) / (grid_size_ - 1);
+            int maxLODRatio = GetTileResolution() / (grid_size_ - 1);
             int maxLOD = 0;
             while (maxLODRatio > 1) {
                 maxLODRatio >>= 1;
@@ -405,7 +459,7 @@ namespace mgn {
         }
         bool MercatorTree::HandleSplit(MercatorNode* node)
         {
-            if (node->lod_ < GetLodLimit())
+            if (node->lod_ < GetMaxLod())
             {
                 SplitQuadTreeNode(node);
                 node->request_split_ = false;
@@ -559,18 +613,6 @@ namespace mgn {
         int MercatorTree::GetFrameCounter() const
         {
             return frame_counter_;
-        }
-        const int MercatorTree::GetLodLimit()
-        {
-            return 22; // up to 22
-        }
-        const float MercatorTree::GetMapSizeMax()
-        {
-            return static_cast<float>(256 << GetLodLimit());
-        }
-        const int MercatorTree::GetTextureSize()
-        {
-            return 257;
         }
         const bool MercatorTree::IsUsingPool()
         {

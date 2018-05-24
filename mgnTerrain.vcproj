@@ -393,14 +393,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\src\mgnTrActiveTrackRenderer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrActiveTrackRenderer.h"
-				>
-			</File>
-			<File
 				RelativePath=".\src\mgnTrAtlasLabel.cpp"
 				>
 			</File>
@@ -421,75 +413,11 @@
 				>
 			</File>
 			<File
-				RelativePath=".\src\mgnTrDirectionalLineRenderer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrDirectionalLineRenderer.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrDottedLineRenderer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrDottedLineRenderer.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrFakeTerrain.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrFakeTerrain.h"
-				>
-			</File>
-			<File
 				RelativePath=".\src\mgnTrFontAtlas.cpp"
 				>
 			</File>
 			<File
 				RelativePath=".\src\mgnTrFontAtlas.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrGpsMmPositionRenderer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrGpsMmPositionRenderer.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrGuidanceArrowRenderer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrGuidanceArrowRenderer.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrHeightmap.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrHeightmap.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrHighlightTrackRenderer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrHighlightTrackRenderer.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrIcon.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrIcon.h"
 				>
 			</File>
 			<File
@@ -501,14 +429,6 @@
 				>
 			</File>
 			<File
-				RelativePath=".\src\mgnTrManeuverRenderer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrManeuverRenderer.h"
-				>
-			</File>
-			<File
 				RelativePath=".\src\mgnTrMesh.cpp"
 				>
 			</File>
@@ -517,91 +437,7 @@
 				>
 			</File>
 			<File
-				RelativePath=".\src\mgnTrPassiveHighlightTrackRenderer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrPassiveHighlightTrackRenderer.h"
-				>
-			</File>
-			<File
 				RelativePath=".\src\mgnTrRenderer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrRouteBeginRenderer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrRouteBeginRenderer.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrRouteEndRenderer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrRouteEndRenderer.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrRoutePointRenderer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrRoutePointRenderer.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrSolidLineRenderer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrSolidLineRenderer.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrTerrainFetcher.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrTerrainFetcher.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrTerrainMap.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrTerrainMap.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrTerrainTile.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrTerrainTile.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrTileCache.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrTileCache.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrTileKey.h"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrVehicleRenderer.cpp"
-				>
-			</File>
-			<File
-				RelativePath=".\src\mgnTrVehicleRenderer.h"
 				>
 			</File>
 			<Filter
@@ -715,10 +551,6 @@
 					RelativePath=".\src\mercator\mgnTrMercatorUtils.cpp"
 					>
 				</File>
-				<File
-					RelativePath=".\src\mercator\mgnTrMercatorUtils.h"
-					>
-				</File>
 			</Filter>
 		</Filter>
 		<Filter
@@ -741,7 +573,15 @@
 				>
 			</File>
 			<File
+				RelativePath=".\include\mgnTrMercatorDataInfo.h"
+				>
+			</File>
+			<File
 				RelativePath=".\include\mgnTrMercatorProvider.h"
+				>
+			</File>
+			<File
+				RelativePath=".\include\mgnTrMercatorUtils.h"
 				>
 			</File>
 			<File

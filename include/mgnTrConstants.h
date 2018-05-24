@@ -7,6 +7,8 @@ namespace mgn {
 
     int GetTileResolution();
     int GetTileHeightSamples();
+    int GetMaxLod();
+    int GetMapSizeMax();
 
     // Height map parameters
     const float GetHeightMin();

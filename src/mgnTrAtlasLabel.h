@@ -5,8 +5,6 @@
 #include "mgnTrBillboard.h"
 #include "mgnBaseType.h"
 
-struct LabelPositionInfo;
-
 namespace math {
     struct Matrix4;
     struct Rect;
@@ -16,13 +14,13 @@ namespace mgn {
     namespace terrain {
 
         class Font;
+        struct LabelData;
 
         //! class for rendering atlas based labels
         class AtlasLabel : public Billboard {
         public:
             explicit AtlasLabel(mgn::graphics::Renderer * renderer, mgnMdTerrainView * terrain_view,
-                graphics::Shader * shader, const vec3* tile_position, const Font * font,
-                const LabelPositionInfo &lpi, unsigned short magIndex);
+                graphics::Shader * shader, const Font * font, const LabelData &data, int lod);
             virtual ~AtlasLabel();
 
             const std::wstring& text() const;
@@ -34,7 +32,7 @@ namespace mgn {
             std::wstring mText; //!< text of label
 
         private:
-            void Create(const Font * font, const LabelPositionInfo &lpi, unsigned short magIndex);
+            void Create(const Font * font, const LabelData &data, int lod);
         };
 
     } // namespace terrain

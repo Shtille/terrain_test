@@ -7,8 +7,79 @@
 #include "mgnTrMercatorRenderable.h"
 #include "mgnTrMercatorService.h"
 
+#include "../mgnTrAtlasLabel.h"
+#include "../mgnTrLabel.h"
+#include "../mgnTrIcon.h"
+
+#include "MapDrawing/Graphics/mgnCommonMath.h"
+
 #include <cstddef>
 #include <assert.h>
+
+static int InterpolateColor(int c1, int c2, float alpha)
+{
+    int a1 = (c1 & 0xff000000) >> 24;
+    int b1 = (c1 & 0xff0000) >> 16;
+    int g1 = (c1 & 0x00ff00) >> 8;
+    int r1 = (c1 & 0x0000ff);
+    int a2 = (c2 & 0xff000000) >> 24;
+    int b2 = (c2 & 0xff0000) >> 16;
+    int g2 = (c2 & 0x00ff00) >> 8;
+    int r2 = (c2 & 0x0000ff);
+    int r = r1 + (int)((r2-r1)*alpha);
+    int g = g1 + (int)((g2-g1)*alpha);
+    int b = b1 + (int)((b2-b1)*alpha);
+    int a = a1 + (int)((a2-a1)*alpha);
+    return (a << 24) | (b << 16) | (g << 8) | r;
+}
+static bool MakePotTextureFromNpot(int width, int height, const std::vector<unsigned char>& vdata,
+    int& out_width, int& out_height, std::vector<unsigned char>& out_data)
+{
+    if (((width & (width-1)) != 0) || ((height & (height-1)) != 0))
+    {
+        // Need to make POT
+        const unsigned int * data = reinterpret_cast<const unsigned int*>(&vdata[0]);
+        int w2 = math::RoundToPowerOfTwo(width);
+        int h2 = math::RoundToPowerOfTwo(height);
+        out_width = w2;
+        out_height = h2;
+
+        // Rescale image to power of 2
+        int new_size = w2 * h2;
+        out_data.resize(new_size*4);
+        unsigned int * new_data = reinterpret_cast<unsigned int*>(&out_data[0]);
+        for (int dh2 = 0; dh2 < h2; ++dh2)
+        {
+            float rh = (float)dh2 / (float)h2;
+            float y = rh * (float)height;
+            int dh = (int)y;
+            int dh1 = std::min<int>(dh+1, height-1);
+            float ry = y - (float)dh; // fract part of y
+            for (int dw2 = 0; dw2 < w2; ++dw2)
+            {
+                float rw = (float)dw2 / (float)w2;
+                float x = rw * (float)width;
+                int dw = (int)x;
+                int dw1 = std::min<int>(dw+1, width-1);
+                float rx = x - (float)dw; // fract part of x
+
+                // We will use bilinear interpolation
+                int sample1 = (int) data[dw +width*dh ];
+                int sample2 = (int) data[dw1+width*dh ];
+                int sample3 = (int) data[dw +width*dh1];
+                int sample4 = (int) data[dw1+width*dh1];
+
+                int color1 = InterpolateColor(sample1, sample2, rx);
+                int color2 = InterpolateColor(sample3, sample4, rx);;
+                int color3 = InterpolateColor(color1, color2, ry);
+                new_data[dw2+w2*dh2] = (unsigned int)color3;
+            }
+        }
+        return true;
+    }
+    else // already a pot texture
+        return false;
+}
 
 namespace mgn {
     namespace terrain {
@@ -20,6 +91,8 @@ namespace mgn {
         , lod_(0)
         , x_(0)
         , y_(0)
+        , parent_slot_(-1)
+        , parent_(NULL)
         , has_children_(false)
         , page_out_(false)
         , has_map_tile_(false)
@@ -35,8 +108,6 @@ namespace mgn {
         , request_icons_(false)
         , has_labels_(false)
         , has_icons_(false)
-        , parent_slot_(-1)
-        , parent_(NULL)
         {
             last_opened_ = last_rendered_ = owner_->GetFrameCounter();
             for (int i = 0; i < 4; ++i)
@@ -49,6 +120,7 @@ namespace mgn {
                 parent_->children_[parent_slot_] = NULL;
             DestroyMapTile();
             DestroyRenderable();
+            UnloadData();
             for (int i = 0; i < 4; ++i)
                 DetachChild(i, false);
         }
@@ -388,8 +460,52 @@ namespace mgn {
             //shader->Uniform4fv("u_color", renderable_.color_);
 
             renderable_.GetMapTile()->BindTexture();
-
             owner_->tile_->Render();
+            owner_->renderer_->ChangeTexture(NULL, 1U);
+
+            owner_->rendered_nodes_.push_back(this);
+        }
+        void MercatorNode::RenderLabels()
+        {
+            MercatorTree::UsedLabelsSet & used_labels = owner_->used_labels_;
+            std::vector<math::Rect> & bboxes = owner_->label_bounding_boxes_;
+
+            for (std::vector<Label*>::iterator it = label_meshes_.begin();
+                it != label_meshes_.end(); ++it)
+            {
+                Label * label = *it;
+                if(used_labels.find(label->text()) == used_labels.end())
+                {
+                    label->render();
+                    used_labels.insert(label->text());
+                }
+            }
+
+            const math::Matrix4& view = owner_->renderer_->view_matrix();
+            for (std::vector<AtlasLabel*>::iterator it = atlas_label_meshes_.begin();
+                it != atlas_label_meshes_.end(); ++it)
+            {
+                AtlasLabel * label = *it;
+                math::Rect bbox;
+                label->GetBoundingBox(view, bbox);
+                bool intersection_found = false;
+                for (std::vector<math::Rect>::const_iterator itb = bboxes.begin();
+                    itb != bboxes.end(); ++itb)
+                {
+                    const math::Rect& checked_bbox = *itb;
+                    if (math::RectRectIntersection2D(bbox, checked_bbox))
+                    {
+                        intersection_found = true;
+                        break;
+                    }
+                }
+                if(!intersection_found && used_labels.find(label->text()) == used_labels.end())
+                {
+                    label->render();
+                    used_labels.insert(label->text());
+                    bboxes.push_back(bbox);
+                }
+            }
         }
         void MercatorNode::OnTextureTaskCompleted(const graphics::Image& image, bool has_errors)
         {
@@ -416,6 +532,69 @@ namespace mgn {
 
             if (has_errors)
                 owner_->RequestHeightmap(this);
+
+            LoadData();
+        }
+        void MercatorNode::OnLabelsTaskCompleted(const std::vector<LabelData>& labels_data, bool has_errors)
+        {
+            // Build label meshes
+            for (std::vector<LabelData>::const_iterator it = labels_data.begin();
+                it != labels_data.end(); ++it)
+            {
+                // Recognize type of billboard (label or shield)
+                const LabelData& data = *it;
+                if (data.centered) // shield
+                {
+                    graphics::Texture * texture;
+                    MercatorTree::ShieldTextureCache::iterator it_shield =
+                        owner_->shield_texture_cache_.find(data.shield_hash);
+                    if (it_shield == owner_->shield_texture_cache_.end())
+                    {
+                        int new_width, new_height;
+                        std::vector<unsigned char> new_data;
+                        // This shield doesn't exist in texture cache, make a new texture from bitmap
+                        if (MakePotTextureFromNpot(data.width, data.height, data.bitmap_data,
+                                                   new_width, new_height, new_data))
+                        {
+                            // Texture data has been converted to power of two
+                            owner_->renderer_->CreateTextureFromData(texture, new_width, new_height,
+                                graphics::Image::Format::kRGBA8, graphics::Texture::Filter::kTrilinear,
+                                &new_data[0]);
+                        }
+                        else
+                        {
+                            // Texture already has power of two sizes
+                            owner_->renderer_->CreateTextureFromData(texture, data.width, data.height,
+                                graphics::Image::Format::kRGBA8, graphics::Texture::Filter::kTrilinear,
+                                &data.bitmap_data[0]);
+                        }
+                        // Also insert texture into cache
+                        owner_->shield_texture_cache_.insert(std::make_pair(data.shield_hash, texture));
+                    }
+                    else
+                    {
+                        // This shield exists in texture cache, so obtain it texture from cache
+                        texture = it_shield->second;
+                    }
+
+                    Label *label = new Label(owner_->renderer_, owner_->terrain_view_,
+                        owner_->billboard_shader_, data, lod_);
+                    label->setTexture(texture, false); // shield texture cache owns the texture
+                    label_meshes_.push_back(label);
+                }
+                else // atlas-based label
+                {
+                    AtlasLabel *label = new AtlasLabel(owner_->renderer_, owner_->terrain_view_,
+                        owner_->billboard_shader_, owner_->font_, data, lod_);
+                    atlas_label_meshes_.push_back(label);
+                }
+            }
+            has_labels_ = true;
+        }
+        void MercatorNode::OnIconsTaskCompleted(const std::vector<IconData>& icons_data, bool has_errors)
+        {
+            // TODO
+            has_icons_ = true;
         }
         void MercatorNode::OnAttach()
         {
@@ -434,12 +613,31 @@ namespace mgn {
                 owner_->RequestLabels(this);
 
             // Request icons load
-            if (!has_icons_)
-                owner_->RequestIcons(this);
+            // if (!has_icons_)
+            //     owner_->RequestIcons(this);
         }
         void MercatorNode::UnloadData()
         {
-            //
+            if (has_labels_)
+            {
+                for (std::vector<Label*>::iterator it = label_meshes_.begin();
+                    it != label_meshes_.end(); ++it)
+                    delete *it;
+                label_meshes_.clear();
+                for (std::vector<AtlasLabel*>::iterator it = atlas_label_meshes_.begin();
+                    it != atlas_label_meshes_.end(); ++it)
+                    delete *it;
+                atlas_label_meshes_.clear();
+                has_labels_ = false;
+            }
+            if (has_icons_)
+            {
+                for (std::vector<Icon*>::iterator it = point_user_meshes_.begin();
+                    it != point_user_meshes_.end(); ++it)
+                    delete *it;
+                point_user_meshes_.clear();
+                has_icons_ = false;
+            }
         }
 
     } // namespace terrain

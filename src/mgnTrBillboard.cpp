@@ -9,12 +9,11 @@ namespace mgn {
     namespace terrain {
 
         Billboard::Billboard(mgn::graphics::Renderer * renderer, mgnMdTerrainView * terrain_view,
-                graphics::Shader * shader, const vec3* tile_position, float scale)
+                graphics::Shader * shader, float scale)
         : Mesh(renderer)
         , mTerrainView(terrain_view)
         , mShader(shader)
         , mTexture(NULL)
-        , mTilePosition(tile_position)
         , mScale(scale)
         , mOwnsTexture(true)
         {
@@ -26,17 +25,23 @@ namespace mgn {
         }
         void Billboard::render()
         {
-            const int kTileResolution = GetTileResolution();
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+            const int lod = mTerrainView->GetLod();
+            const float cell_size = static_cast<float>(1 << (GetMaxLod() - lod));
 
             renderer_->ChangeTexture(mTexture);
 
+            float cam_distance;
+            mTerrainView->LocalToPixelDistance((float)mTerrainView->getCamDistance(), cam_distance, kMSM);
+            vec3 cam_position;
+            mTerrainView->LocalToPixel(mTerrainView->getCamPosition(), cam_position, kMSM);
+
             float tilt    = (float)mTerrainView->getCamTiltRad();
             float heading = (float)mTerrainView->getCamHeadingRad();
-            float s       = (float)mTerrainView->getCellSizeLon() / kTileResolution;
-            float scale   = (float)mTerrainView->getCamDistance() * mScale / s;
+            float scale   = cam_distance * mScale / cell_size;
 
-            vec3 world_position(mPosition + *mTilePosition);
-            float icon_distance = math::Distance(world_position, mTerrainView->getCamPosition());
+            vec3 world_position(mPosition);
+            float icon_distance = math::Distance(world_position, cam_position);
 
             mShader->Uniform1f("u_occlusion_distance", icon_distance);
 
@@ -75,19 +80,18 @@ namespace mgn {
         }
         void Billboard::GetIconSize(vec2& size)
         {
-            const int kTileResolution = GetTileResolution();
-            float s = (float)mTerrainView->getCellSizeLon() / kTileResolution;
-            float scale   = (float)mTerrainView->getCamDistance() * mScale / s;
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+            const int lod = mTerrainView->GetLod();
+            const float cell_size = static_cast<float>(1 << (GetMaxLod() - lod));
+            float cam_distance;
+            mTerrainView->LocalToPixelDistance((float)mTerrainView->getCamDistance(), cam_distance, kMSM);
+            float scale   = cam_distance * mScale / cell_size;
             size.x = mWidth * scale;
             size.y = mHeight * scale;
         }
         const vec3& Billboard::position() const
         {
             return mPosition;
-        }
-        const vec3& Billboard::tile_position() const
-        {
-            return *mTilePosition;
         }
         Billboard::OriginType Billboard::getOrigin() const
         {

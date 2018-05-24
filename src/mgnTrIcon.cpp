@@ -12,8 +12,8 @@ namespace mgn {
     namespace terrain {
 
         Icon::Icon(mgn::graphics::Renderer * renderer, mgnMdTerrainView * terrain_view,
-                graphics::Shader * shader, const vec3* tile_position, const PointUserObjectInfo &pui, unsigned short magIndex)
-        : Billboard(renderer, terrain_view, shader, tile_position, 0.001f)
+                graphics::Shader * shader, const PointUserObjectInfo &pui, unsigned short magIndex)
+        : Billboard(renderer, terrain_view, shader, 0.001f)
         , mID(pui.id)
         , mMapObjectInfo(pui.poi_info)
         , mIsPOI(pui.is_poi)
@@ -38,7 +38,7 @@ namespace mgn {
         }
         void Icon::GetIconSize(vec2& size)
         {
-            vec4 world_position(mPosition + *mTilePosition, 1.0f);
+            vec4 world_position(mPosition, 1.0f);
             vec4 pos_eye = renderer_->view_matrix() * world_position;
 
             float icon_distance = pos_eye.z;
@@ -57,7 +57,7 @@ namespace mgn {
             float tilt    = (float)mTerrainView->getCamTiltRad();
             float heading = (float)mTerrainView->getCamHeadingRad();
 
-            vec4 world_position(mPosition + *mTilePosition, 1.0f);
+            vec4 world_position(mPosition, 1.0f);
             vec4 pos_eye = renderer_->view_matrix() * world_position;
 
             mShader->Uniform1f("u_occlusion_distance", pos_eye.xyz().Length());

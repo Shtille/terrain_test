@@ -4,13 +4,17 @@
 
 #include "mgnTrMercatorNode.h"
 
+#include <boost/unordered_set.hpp>
+
 #include <list>
 #include <set>
+#include <map>
 #include <queue>
 
 class mgnMdTerrainView;
 namespace math {
     class Frustum;
+    struct Rect;
 }
 
 namespace mgn {
@@ -22,6 +26,7 @@ namespace mgn {
         class MercatorService;
         class MercatorProvider;
         class MercatorNodePool;
+        class Font;
 
 #ifdef DEBUG
         struct MercatorDebugInfo {
@@ -71,24 +76,21 @@ namespace mgn {
             typedef std::priority_queue<MercatorNode*, std::vector<MercatorNode*>, MercatorNodeCompareLastOpened> NodeHeap;
 
         public:
-            MercatorTree(graphics::Renderer * renderer, graphics::Shader * shader,
+            MercatorTree(graphics::Renderer * renderer,
+                graphics::Shader * shader, graphics::Shader * billboard_shader, const Font * font,
                 math::Frustum * frustum, mgnMdTerrainView * terrain_view,
                 MercatorProvider * provider);
             ~MercatorTree();
 
             //! Data video memory objects creation and other things that may fail
-            bool Initialize();
-
-            void SetParameters(float fovy_in_radians, int screen_height);
+            bool Initialize(float fovy_in_radians, int screen_height);
 
             void Update();
             void Render();
+            void RenderLabels();
 
             const int grid_size() const;
 
-            static const int GetLodLimit();
-            static const float GetMapSizeMax();
-            static const int GetTextureSize();
             static const bool IsUsingPool();
 
             int GetFrameCounter() const;
@@ -121,6 +123,8 @@ namespace mgn {
         private:
             graphics::Renderer * renderer_;     //!< pointer to renderer object
             graphics::Shader * shader_;         //!< pointer to shader object
+            graphics::Shader * billboard_shader_;//!< pointer to shader object
+            const Font * font_;
             math::Frustum * frustum_;           //!< pointer to frustum object
             mgnMdTerrainView * terrain_view_;   //!< pointer to terrain view object
             MercatorProvider * provider_;       //!< pointer to provider object
@@ -149,6 +153,20 @@ namespace mgn {
             bool preprocess_;
             bool lod_freeze_;
             bool tree_freeze_;
+
+            // Misc
+            std::vector<MercatorNode*> rendered_nodes_; //!< for optimized rendering of labels and other data
+
+            typedef std::map<size_t, graphics::Texture*> IconTextureCache;
+            IconTextureCache icon_texture_cache_;
+
+            typedef std::map<unsigned int, graphics::Texture*> ShieldTextureCache;
+            ShieldTextureCache shield_texture_cache_;
+
+            std::vector<math::Rect> label_bounding_boxes_; //!< to not render overlapping labels
+            typedef boost::unordered_set<std::wstring> UsedLabelsSet;
+            UsedLabelsSet used_labels_; //!< to not render duplicated labels
+            std::list<Icon*> icons_list_; //!< list of icons (any billboard objects) for rendering
         };
 
     } // namespace terrain

@@ -4,7 +4,7 @@
 
 #include "mgnTrMercatorTask.h"
 
-#include "MapDrawing/Graphics/mgnImage.h"
+#include "mgnTrMercatorDataInfo.h"
 
 namespace mgn {
     namespace terrain {
@@ -22,7 +22,8 @@ namespace mgn {
 
         private:
             MercatorProvider * provider_;
-            graphics::Image image_;
+            std::vector<LabelData> labels_data_;
+            bool has_errors_;
         };
 
     } // namespace terrain

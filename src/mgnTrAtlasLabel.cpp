@@ -1,8 +1,8 @@
 #include "mgnTrAtlasLabel.h"
+
 #include "mgnTrConstants.h"
 #include "mgnTrFontAtlas.h"
-
-#include "mgnMdTerrainProvider.h"
+#include "mgnTrMercatorDataInfo.h"
 #include "mgnMdTerrainView.h"
 
 #include "mgnMdBitmap.h"
@@ -13,12 +13,11 @@ namespace mgn {
     namespace terrain {
 
         AtlasLabel::AtlasLabel(mgn::graphics::Renderer * renderer, mgnMdTerrainView * terrain_view,
-                graphics::Shader * shader, const vec3* tile_position, const Font * font,
-                const LabelPositionInfo &lpi, unsigned short magIndex)
-        : Billboard(renderer, terrain_view, shader, tile_position, 0.002f)
-        , mText(lpi.text)
+                graphics::Shader * shader, const Font * font, const LabelData &data, int lod)
+        : Billboard(renderer, terrain_view, shader, 0.002f)
+        , mText(data.text)
         {
-            Create(font, lpi, magIndex);
+            Create(font, data, lod);
             MakeRenderable();
             setTexture(font->texture(), false); // font owns texture object
         }
@@ -34,7 +33,8 @@ namespace mgn {
             vec2 size;
             GetIconSize(size);
 
-            vec4 icon_pos_world(mPosition + *mTilePosition, 1.0f);
+            // World space position
+            vec4 icon_pos_world(mPosition, 1.0f);
             vec4 icon_pos_eye = view * icon_pos_world;
 
             switch (getOrigin())
@@ -59,32 +59,28 @@ namespace mgn {
             rect.vertices[3] = rect.vertices[0];
             rect.vertices[3].y -= size.y;
         }
-        void AtlasLabel::Create(const Font * font, const LabelPositionInfo &lpi, unsigned short magIndex)
+        void AtlasLabel::Create(const Font * font, const LabelData &data, int lod)
         {
-            const int kTileResolution = GetTileResolution();
+            const float kMSM = static_cast<float>(GetMapSizeMax());
+            const float kCellSize = static_cast<float>(1 << (GetMaxLod() - lod)); // MSM / 2^lod / TileRes
 
-            float metersInPixelLat = (float)mTerrainView->getCellSizeLat(magIndex)/kTileResolution;
-            float metersInPixelLon = (float)mTerrainView->getCellSizeLon(magIndex)/kTileResolution;
-            int magIndexDelta = magIndex - mTerrainView->getMagIndex();
-            if (magIndexDelta < 0) magIndexDelta = 0;
-            float scale_tex = (float)mTerrainView->getPixelScale()/1.5f * 2.0f;//(float)(1 << (magIndexDelta+1));
+            float scale_tex = (float)mTerrainView->getPixelScale()/1.5f * 2.0f;
 
             // Coefficients to convert from bitmap to tile coordinates (meters)
-            const float kB2WX = metersInPixelLon / scale_tex * font->scale();
-            const float kB2WY = metersInPixelLat / scale_tex * font->scale();
+            const float kB2WX = kCellSize / scale_tex * font->scale();
+            const float kB2WY = kCellSize / scale_tex * font->scale();
 
             // Coordinates of the middle-bottom point of label
-            mPosition.x = metersInPixelLon*lpi.lon;
-            mPosition.y = (float)          lpi.alt;
-            mPosition.z = metersInPixelLat*lpi.lat;
+            mTerrainView->WorldToPixel(data.latitude, data.longitude, data.altitude,
+                mPosition, kMSM);
 
             // Compute vertex size of label
             float offset_x = 0.0f;
             float offset_y = 0.0f;
-            float min_x = 1e7;
-            float min_y = 1e7;
-            float max_x = -1e7;
-            float max_y = -1e7;
+            float min_x = kMSM;
+            float min_y = kMSM;
+            float max_x = -kMSM;
+            float max_y = -kMSM;
             for (const wchar_t* p = mText.c_str(); *p != L'\0'; ++p)
             {
                 const FontCharInfo* info = font->info(*p);
@@ -118,11 +114,11 @@ namespace mgn {
             float size_x = max_x - min_x;
             float size_y = max_y - min_y;
 
-            mOrigin = (lpi.centered) ? Billboard::kBottomMiddle : Billboard::kBottomLeft;
+            mOrigin = (data.centered) ? Billboard::kBottomMiddle : Billboard::kBottomLeft;
             mWidth = size_x * kB2WX;
             mHeight = size_y * kB2WY;
 
-            if (lpi.centered)
+            if (data.centered)
             {
                 offset_x = -0.5f * size_x;
                 offset_y = -0.5f * size_y;

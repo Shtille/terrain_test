@@ -71,10 +71,12 @@ private:
     float mZNear;       //!< Distance to the near clipping plane
     float mZFar;        //!< Distance to the far clipping plane
     float mFovX;        //!< Field of view in x direction
+    int mLod;           //!< Current LOD in Mercator tile system
 
     mgnMdTerrainProvider * mTerrainProvider;
 
     bool isViewPathClear(double horz_dist, double tilt, double dxm) const;
+    void updateLod();
 
 public:
     mgnMdTerrainView(mgnMdWorldPoint location,int altitude);
@@ -129,6 +131,8 @@ public:
     float  getFovX              () const;
     float  getLargestCamDistance() const;
 
+    int GetLod() const;
+
     // Attendant parameters
     unsigned short getMagIndex  () const;
     double getMagnitude         () const;
@@ -159,6 +163,8 @@ public:
     void PixelToLocalDistance(float pixel_x, float& local_x, float map_size_max) const;
     void LocalToPixel(const vec3& local, vec3& pixel, float map_size_max) const;
     void PixelLocation(vec3& pixel, float map_size_max) const;
+
+    void WorldToPixel(double latitude, double longitude, double altitude, vec3& pixel, float map_size_max) const;
 
     void IntersectionWithRay(const vec3& ray, vec3& intersection) const;
 

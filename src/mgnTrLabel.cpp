@@ -1,7 +1,8 @@
 #include "mgnTrLabel.h"
-#include "mgnTrConstants.h"
 
-#include "mgnMdTerrainProvider.h"
+#include "mgnTrConstants.h"
+#include "mgnTrMercatorDataInfo.h"
+
 #include "mgnMdTerrainView.h"
 
 #include "mgnMdBitmap.h"
@@ -10,11 +11,11 @@ namespace mgn {
     namespace terrain {
 
         Label::Label(mgn::graphics::Renderer * renderer, mgnMdTerrainView * terrain_view,
-                graphics::Shader * shader, const vec3* tile_position, const LabelPositionInfo &lpi, unsigned short magIndex)
-        : Billboard(renderer, terrain_view, shader, tile_position, 0.002f)
-        , mText(lpi.text)
+                graphics::Shader * shader, const LabelData &data, int lod)
+        : Billboard(renderer, terrain_view, shader, 0.002f)
+        , mText(data.text)
         {
-            Create(lpi, magIndex);
+            Create(data, lod);
             MakeRenderable();
         }
         Label::~Label()
@@ -24,28 +25,26 @@ namespace mgn {
         {
             return mText;
         }
-        void Label::Create(const LabelPositionInfo &lpi, unsigned short magIndex)
+        void Label::Create(const LabelData &data, int lod)
         {
-            const int kTileResolution = GetTileResolution();
+            const float kMSM = static_cast<float>(GetMapSizeMax());
+            const float kCellSize = static_cast<float>(1 << (GetMaxLod() - lod));
 
-            float metersInPixelLat = (float)mTerrainView->getCellSizeLat(magIndex)/kTileResolution;
-            float metersInPixelLon = (float)mTerrainView->getCellSizeLon(magIndex)/kTileResolution;
-            int magIndexDelta = magIndex - mTerrainView->getMagIndex();
-            if (magIndexDelta < 0) magIndexDelta = 0;
-            float scale_tex = (float)mTerrainView->getPixelScale()/1.5f * (float)(1 << (magIndexDelta+1));
+            int lod_delta = mTerrainView->GetLod() - lod;
+            if (lod_delta < 0) lod_delta = 0;
+            float scale_tex = (float)mTerrainView->getPixelScale()/1.5f * (float)(1 << (lod_delta+1));
 
             // Label size (in meters)
-            float w = metersInPixelLon*lpi.w/scale_tex;
-            float h = metersInPixelLat*lpi.h/scale_tex;
+            float w = kCellSize * data.width / scale_tex;
+            float h = kCellSize * data.height / scale_tex;
 
-            mOrigin = (lpi.centered) ? Billboard::kBottomMiddle : Billboard::kBottomLeft;
+            mOrigin = (data.centered) ? Billboard::kBottomMiddle : Billboard::kBottomLeft;
             mWidth = w;
             mHeight = h;
 
             // Coordinates of the middle-bottom point of label
-            mPosition.x = metersInPixelLon*lpi.lon;
-            mPosition.y = (float)          lpi.alt;
-            mPosition.z = metersInPixelLat*lpi.lat;
+            mTerrainView->WorldToPixel(data.latitude, data.longitude, data.altitude,
+                mPosition, kMSM);
 
             unsigned int vertex_size = 5 * sizeof(float);
             index_size_ = sizeof(unsigned short);
@@ -62,8 +61,8 @@ namespace mgn {
             // bottom-left
             {
                 // position
-                vertices[ind++] = lpi.centered ? (-w/2.0f) : 0;
-                vertices[ind++] = lpi.centered ? (-h/2.0f) : 0;
+                vertices[ind++] = data.centered ? (-w/2.0f) : 0;
+                vertices[ind++] = data.centered ? (-h/2.0f) : 0;
                 vertices[ind++] = 0.0f;
                 // texture coordinates (0..1)
                 vertices[ind++] = 0.0f;
@@ -72,8 +71,8 @@ namespace mgn {
             // bottom-right
             {
                 // position
-                vertices[ind++] = lpi.centered ? (w/2.0f) : w;
-                vertices[ind++] = lpi.centered ? (-h/2.0f) : 0.0f;
+                vertices[ind++] = data.centered ? (w/2.0f) : w;
+                vertices[ind++] = data.centered ? (-h/2.0f) : 0.0f;
                 vertices[ind++] = 0.0f;
                 // texture coordinates (0..1)
                 vertices[ind++] = 1.0f;
@@ -82,8 +81,8 @@ namespace mgn {
             // upper-left
             {
                 // position
-                vertices[ind++] = lpi.centered ? (-w/2.0f) : 0.0f;
-                vertices[ind++] = lpi.centered ? (h/2.0f) : h;
+                vertices[ind++] = data.centered ? (-w/2.0f) : 0.0f;
+                vertices[ind++] = data.centered ? (h/2.0f) : h;
                 vertices[ind++] = 0.0f;
                 // texture coordinates (0..1)
                 vertices[ind++] = 0.0f;
@@ -93,8 +92,8 @@ namespace mgn {
             // upper-right
             {
                 // position
-                vertices[ind++] = lpi.centered ? (w/2.0f) : w;
-                vertices[ind++] = lpi.centered ? (h/2.0f) : h;
+                vertices[ind++] = data.centered ? (w/2.0f) : w;
+                vertices[ind++] = data.centered ? (h/2.0f) : h;
                 vertices[ind++] = 0.0f;
                 // texture coordinates (0..1)
                 vertices[ind++] = 1.0f;

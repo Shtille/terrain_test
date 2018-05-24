@@ -1,4 +1,6 @@
 #include "mgnMdTerrainView.h"
+#include "mgnTrConstants.h"
+
 #include <math.h>
 #include <algorithm>
 
@@ -87,6 +89,7 @@ mgnMdTerrainView::mgnMdTerrainView(mgnMdWorldPoint location,int altitude):
   mZNear(1.0f),
   mZFar(1000.0f),
   mFovX(PI*0.4f),
+  mLod(5),
   mTerrainProvider(NULL)
 {
 }
@@ -216,6 +219,18 @@ bool mgnMdTerrainView::isViewPathClear(double horz_dist, double tilt, double dxm
     while (distance < horz_dist);
 
     return true;
+}
+void mgnMdTerrainView::updateLod()
+{
+    const int kTileResolution = mgn::terrain::GetTileResolution();
+    const int kMaxLod = mgn::terrain::GetMaxLod();
+    const double kScreenWidth = 500.0;
+    const double kInvLog2 = 1.442695040888963; // 1/ln(2)
+    double ex = (20037508.34 / mCamDistance) * (kScreenWidth / static_cast<double>(kTileResolution));
+    double log_value = log(ex) * kInvLog2;
+    mLod = static_cast<int>(log_value) + 1; // ~ ceil(log_value)
+    if (mLod < 0) mLod = 0;
+    if (mLod > kMaxLod) mLod = kMaxLod;
 }
 void mgnMdTerrainView::update() const
 {
@@ -458,6 +473,10 @@ float mgnMdTerrainView::getLargestCamDistance() const
 {
     return mZFar;
 }
+int mgnMdTerrainView::GetLod() const
+{
+    return mLod;
+}
 void mgnMdTerrainView::setTerrainProvider(mgnMdTerrainProvider * provider)
 {
     mTerrainProvider = provider;
@@ -493,6 +512,7 @@ void  mgnMdTerrainView::setCamDistance    (float v)
     mCamDistance = v;
     if (mAutoMag && delta > 0.1) mMagnitude = -1;
     getMagnitude();
+    updateLod();
     //---
     //mZFar = 10.0f * mCamDistance;
     mZFar = (2.5f + cos((float)mTilt)) * (float)getMagnitudeByIndex(mMagIndex + 3);
@@ -569,6 +589,17 @@ void mgnMdTerrainView::PixelLocation(vec3& pixel, float map_size_max) const
 
     pixel.x = x * map_size_max; // we want East to be in positive direction of X axis
     pixel.y = mCenterHeight / 360.0f * map_size_max / 111111.0f;
+    pixel.z = (1.0f - y) * map_size_max; // we want North to be in positive direction of Z axis
+}
+void mgnMdTerrainView::WorldToPixel(double latitude, double longitude, double altitude, vec3& pixel, float map_size_max) const
+{
+    float x = ((float)longitude + 180.0f) / 360.0f;
+
+    float sin_latitude = sin((float)latitude * (math::kPi / 180.0f));
+    float y = 0.5f - log((1.0f + sin_latitude) / (1.0f - sin_latitude)) / (4.0f * math::kPi);
+
+    pixel.x = x * map_size_max; // we want East to be in positive direction of X axis
+    pixel.y = ((float)altitude) / 360.0f * map_size_max / 111111.0f;
     pixel.z = (1.0f - y) * map_size_max; // we want North to be in positive direction of Z axis
 }
 void mgnMdTerrainView::IntersectionWithRay(const vec3& ray, vec3& intersection) const
