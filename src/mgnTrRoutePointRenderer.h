@@ -6,7 +6,6 @@
 #include <vector>
 
 class mgnMdTerrainView;
-class mgnMdTerrainProvider;
 
 namespace math {
     class Frustum;
@@ -14,6 +13,8 @@ namespace math {
 
 namespace mgn {
     namespace terrain {
+
+        class MercatorProvider;
 
         //! Base class for rendering route point
         class RoutePointRenderer : private Mesh
@@ -23,7 +24,7 @@ namespace mgn {
                 graphics::Shader * shader);
             virtual ~RoutePointRenderer();
 
-            virtual void Update(mgnMdTerrainProvider * provider) = 0;
+            virtual void Update(MercatorProvider * provider) = 0;
             void Render(const math::Frustum& frustum, const vec3& vehicle_pos, float vehicle_size);
 
         protected:

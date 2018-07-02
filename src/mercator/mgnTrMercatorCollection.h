@@ -1,6 +1,6 @@
 #pragma once
-#ifndef __MGN_TERRAIN_MERCATOR_TREE_H__
-#define __MGN_TERRAIN_MERCATOR_TREE_H__
+#ifndef __MGN_TERRAIN_MERCATOR_COLLECTION_H__
+#define __MGN_TERRAIN_MERCATOR_COLLECTION_H__
 
 #include "mgnTrMercatorNode.h"
 
@@ -48,7 +48,7 @@ namespace mgn {
         };
 
         //! Mercator tree rendering class
-        class MercatorTree {
+        class MercatorCollection {
             friend class MercatorNode;
             friend class MercatorRenderable;
             friend class MercatorMapTile;
@@ -77,11 +77,11 @@ namespace mgn {
             typedef std::priority_queue<MercatorNode*, std::vector<MercatorNode*>, MercatorNodeCompareLastOpened> NodeHeap;
 
         public:
-            MercatorTree(graphics::Renderer * renderer,
+            MercatorCollection(graphics::Renderer * renderer,
                 graphics::Shader * shader, graphics::Shader * billboard_shader, const Font * font,
                 math::Frustum * frustum, mgnMdTerrainView * terrain_view,
                 MercatorProvider * provider, const mgnMdWorldPosition * gps_position);
-            ~MercatorTree();
+            ~MercatorCollection();
 
             //! Data video memory objects creation and other things that may fail
             bool Initialize(float fovy_in_radians, int screen_height);
@@ -99,6 +99,8 @@ namespace mgn {
             int GetFrameCounter() const;
 
         protected:
+            void FillRenderedKeys();
+            void PrepareNodes();
             void SplitQuadTreeNode(MercatorNode* node);
             void MergeQuadTreeNode(MercatorNode* node);
             void Request(MercatorNode* node, int type, bool priority = false);
@@ -159,7 +161,10 @@ namespace mgn {
             bool tree_freeze_;
 
             // Misc
+            std::vector<MercatorNodeKey> rendered_keys_;
             std::vector<MercatorNode*> rendered_nodes_; //!< for optimized rendering of labels and other data
+            typedef std::map<MercatorNodeKey, MercatorNode*> AllocatedNodes;
+            std::map<MercatorNodeKey, MercatorNode*> allocated_nodes_;
 
             typedef std::map<size_t, graphics::Texture*> IconTextureCache;
             IconTextureCache icon_texture_cache_;

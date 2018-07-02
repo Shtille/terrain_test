@@ -10,11 +10,13 @@ struct PointUserObjectInfo;
 namespace mgn {
     namespace terrain {
 
+        struct IconData;
+
         //! class for rendering icons
         class Icon : public Billboard {
         public:
             explicit Icon(mgn::graphics::Renderer * renderer, mgnMdTerrainView * terrain_view,
-                graphics::Shader * shader, const PointUserObjectInfo &pui, unsigned short magIndex);
+                graphics::Shader * shader, const IconData& data, int lod);
             virtual ~Icon();
 
             void render();
@@ -25,7 +27,7 @@ namespace mgn {
             bool isPOI() const;
 
         private:
-            void Create(const PointUserObjectInfo &pui, unsigned short magIndex);
+            void Create(const IconData& data, int lod);
 
             int mID; //!< icon ID for selection
             mgnMdMapObjectInfo mMapObjectInfo; //!< map object info for POI

@@ -59,6 +59,10 @@ namespace mgn {
             void UpdateLocationIndicator(double lat, double lon, double altitude,
                 double heading, double tilt, int color1, int color2);
 
+            const math::Matrix4& GetOldViewMatrix() const;
+            const math::Matrix4& GetLocalProjectionMatrix() const;
+            math::Matrix4 GetLocalViewMatrix() const;
+
             void IntersectionWithRay(const math::Vector3& ray, math::Vector3& intersection) const;
 
             //! Returns icon IDs under cursor
@@ -83,6 +87,8 @@ namespace mgn {
             int mSizeX, mSizeY;
             float mFovX, mFovY;
             math::Matrix4 mProjectionViewMatrix;
+            math::Matrix4 mLocalProjectionMatrix; //!< projection matrix for meter-based coordinate system
+            math::Matrix4 mOldViewMatrix; //!< view matrix for meter-based coordinate system
             math::Frustum mFrustum;
 
             mgn::TimeManager * mTimeManager;

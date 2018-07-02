@@ -2,11 +2,11 @@
 
 #define MGNTR_MERCATOR_TILE
 
-#ifndef MGNTR_MERCATOR_TILE
 #include "mgnTrVehicleRenderer.h"
 #include "mgnTrGpsMmPositionRenderer.h"
 #include "mgnTrRouteBeginRenderer.h"
 #include "mgnTrRouteEndRenderer.h"
+#ifndef MGNTR_MERCATOR_TILE
 #include "mgnTrGuidanceArrowRenderer.h"
 #include "mgnTrManeuverRenderer.h"
 #include "mgnTrDirectionalLineRenderer.h"
@@ -42,6 +42,10 @@
 #include "mercator/mgnTrMercatorTree.h"
 #endif
 
+// FOR TEST
+#include "mgnTrMercatorProvider.h"
+#include "mgnLog.h"
+
 //#define COUNT_PERFORMANCE
 
 #ifdef COUNT_PERFORMANCE
@@ -75,6 +79,7 @@ namespace mgn {
 
         // Set projection matrix from terrain view's fovx value
         UpdateProjectionMatrix();
+        mOldViewMatrix.Identity();
 
         mTimeManager = new mgn::TimeManager();
 
@@ -113,9 +118,17 @@ namespace mgn {
         mTerrainMap->setHighlightRenderer( mHighlightTrackRenderer );
         mTerrainMap->setPassiveHighlightRenderer(mPassiveHighlightTrackRenderer);
 #else
+        mVehicleRenderer = new VehicleRenderer(renderer, terrain_view,
+            mPositionShadeTexcoordShader);
         mMercatorTree = new MercatorTree(renderer, mMercatorTileShader, mBillboardShader, mFont,
-            &mFrustum, terrain_view, mercator_provider);
+            &mFrustum, terrain_view, mercator_provider, mVehicleRenderer->GetPosPtr());
         mMercatorTree->Initialize(mFovY, size_y);
+        mRouteBeginRenderer = new RouteBeginRenderer(renderer, terrain_view,
+            mPositionNormalShader);
+        mRouteEndRenderer = new RouteEndRenderer(renderer, terrain_view,
+            mPositionNormalShader);
+        mGpsMmPositionRenderer = new GpsMmPositionRenderer(renderer, terrain_view,
+            mPositionNormalShader);
 #endif
 
 #ifdef COUNT_PERFORMANCE
@@ -133,7 +146,11 @@ namespace mgn {
         mTimeManager->RemoveTimer(s_timer);
 #endif
 #ifdef MGNTR_MERCATOR_TILE
+        delete mGpsMmPositionRenderer;
+        delete mRouteEndRenderer;
+        delete mRouteBeginRenderer;
         delete mMercatorTree;
+        delete mVehicleRenderer;
 #else   
         delete mGpsMmPositionRenderer;
         delete mRouteEndRenderer;
@@ -190,6 +207,10 @@ namespace mgn {
             mGuidanceArrowRenderer->UpdateLineWidth(fovx, distance_to_camera);
         }
 #else
+        mVehicleRenderer->Update();
+        mRouteBeginRenderer->Update(mMercatorProvider);
+        mRouteEndRenderer->Update(mMercatorProvider);
+        mGpsMmPositionRenderer->Update(mMercatorProvider);
         mMercatorTree->Update();
 #endif
 
@@ -231,9 +252,25 @@ namespace mgn {
 
         mVehicleRenderer->Render();
 #else
-        mRenderer->EnableBlend();
         mMercatorTree->Render();
+
+        // Active track here
+        static bool check_memory = false;
+        if (check_memory)
+        {
+            unsigned int memory_size = mRenderer->GetUsedVideoMemorySize();
+            LOG_INFO(0, ("Memory: %u", memory_size));
+        }
+
         mMercatorTree->RenderLabels();
+
+        mRouteBeginRenderer->Render(mFrustum,
+            mVehicleRenderer->GetCenter(), mVehicleRenderer->GetSize());
+        mRouteEndRenderer->Render(mFrustum,
+            mVehicleRenderer->GetCenter(), mVehicleRenderer->GetSize());
+        mGpsMmPositionRenderer->Render();
+
+        mVehicleRenderer->Render();
 #endif
     }
     void Renderer::OnResize(int size_x, int size_y)
@@ -263,27 +300,57 @@ namespace mgn {
             world_rect.left(), world_rect.top(), world_rect.right(), world_rect.bottom());
         TrailDb::TileViewport::GetInstance()->SetWorldRect(
             world_rect.left(), world_rect.top(), world_rect.right(), world_rect.bottom());
+#else
+        mMercatorTree->UpdateIconList();
 #endif
     }
     void Renderer::UpdateProjectionMatrix()
     {
-        //mRenderer->SetProjectionMatrix(math::PerspectiveMatrix(45.0f, mSizeX, mSizeY, 0.1f, 100.0f));
-        float zfar = mTerrainView->getZFar();
-        float znear = mTerrainView->getZNear();
-#ifdef MGNTR_MERCATOR_TILE
-        const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
-        mTerrainView->LocalToPixelDistance(zfar, zfar, kMSM);
-        mTerrainView->LocalToPixelDistance(znear, znear, kMSM);
-#endif
-        mFovX = mTerrainView->getFovX();
-        mFovY = ((float)mSizeY / (float)mSizeX) * mFovX;
-        if (mFovX < mFovY) // book orientation field of view fix
+        if (mTerrainView->Is3D())
         {
-            float old_fovy = mFovY;
-            mFovY = mFovX;
-            mFovX *= mFovX / old_fovy;
+            float zfar = mTerrainView->getZFar();
+            float znear = mTerrainView->getZNear();
+            mFovX = mTerrainView->getFovX();
+            mFovY = ((float)mSizeY / (float)mSizeX) * mFovX;
+            if (mFovX < mFovY) // book orientation field of view fix
+            {
+                float old_fovy = mFovY;
+                mFovY = mFovX;
+                mFovX *= mFovX / old_fovy;
+            }
+            mLocalProjectionMatrix = math::RetardedPerspectiveMatrix(mFovX, mSizeX, mSizeY, znear, zfar);
+#ifdef MGNTR_MERCATOR_TILE
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+            mTerrainView->LocalToPixelDistance(zfar, zfar, kMSM);
+            mTerrainView->LocalToPixelDistance(znear, znear, kMSM);
+#endif
+            mRenderer->SetProjectionMatrix(math::RetardedPerspectiveMatrix(mFovX, mSizeX, mSizeY, znear, zfar));
         }
-        mRenderer->SetProjectionMatrix(math::RetardedPerspectiveMatrix(mFovX, mSizeX, mSizeY, znear, zfar));
+        else // 2D
+        {
+            float aspect_ratio = mRenderer->aspect_ratio();
+            float left = 0.0f;
+            float right = aspect_ratio;
+            float bottom = 0.0f;
+            float top = 1.0f;
+            float znear = mTerrainView->getZNear();
+            float zfar = mTerrainView->getZFar();
+            float rl = right - left;
+            float tb = top - bottom;
+            float fn = zfar - znear;
+
+            math::Matrix4 mat(
+                2.0f / rl, 0.0f, 0.0f, 0.0f,
+                0.0f, 2.0f / tb, 0.0f, 0.0f,
+                0.0f, 0.0f, -2.0f / fn, 0.0f,
+                -(right + left) / rl, -(top + bottom) / tb, -(zfar + znear) / fn, 1.0f);
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+            mLocalProjectionMatrix = math::OrthoMatrix(left, right, bottom, top, znear, zfar);
+            mTerrainView->LocalToPixelDistance(zfar, zfar, kMSM);
+            mTerrainView->LocalToPixelDistance(znear, znear, kMSM);
+            math::Matrix4 proj = math::OrthoMatrix(left, right, bottom, top, znear, zfar);
+            mRenderer->SetProjectionMatrix(mat);
+        }
     }
     void Renderer::UpdateViewMatrix()
     {
@@ -323,7 +390,9 @@ namespace mgn {
             view_matrix *= rotation_heading;
 #ifndef MGNTR_MERCATOR_TILE
             view_matrix *= math::Translate(0.0f, -center_height, 0.0f);
+            mOldViewMatrix = view_matrix;
 #else
+            mOldViewMatrix = view_matrix * math::Translate(0.0f, -center_height, 0.0f);
             const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
             vec3 translation;
             mTerrainView->PixelLocation(translation, kMSM);
@@ -361,7 +430,9 @@ namespace mgn {
             view_matrix *= rotation_heading;
 #ifndef MGNTR_MERCATOR_TILE
             view_matrix *= math::Translate(0.0f, -center_height, 0.0f);
+            mOldViewMatrix = view_matrix;
 #else
+            mOldViewMatrix = view_matrix * math::Translate(0.0f, -center_height, 0.0f);
             const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
             vec3 translation;
             mTerrainView->PixelLocation(translation, kMSM);
@@ -496,7 +567,82 @@ namespace mgn {
         mActiveTrackRenderer->onGpsPositionChange();
         mHighlightTrackRenderer->onGpsPositionChange(lat, lon);
         mPassiveHighlightTrackRenderer->onGpsPositionChange(lat, lon);
+#else
+        mVehicleRenderer->UpdateLocationIndicator(lat, lon, altitude, heading, tilt, color1, color2);
 #endif
+    }
+    const math::Matrix4& Renderer::GetOldViewMatrix() const
+    {
+        return mOldViewMatrix;
+    }
+    const math::Matrix4& Renderer::GetLocalProjectionMatrix() const
+    {
+        return mLocalProjectionMatrix;
+    }
+    math::Matrix4 Renderer::GetLocalViewMatrix() const
+    {
+        float camera_distance = (float)mTerrainView->getCamDistance();
+        float camera_tilt = (float)mTerrainView->getCamTiltRad();
+        float camera_heading = (float)mTerrainView->getCamHeadingRad();
+        float center_height = (float)mTerrainView->getCenterHeight();
+
+        math::Matrix4 view_matrix;
+        view_matrix = math::Scale4(1.0f, -1.0f, 1.0f);
+        if (mTerrainView->isPanMap())
+        {
+            float cos_h = cos(camera_heading);
+            float sin_h = sin(camera_heading);
+            float cos_t = cos(camera_tilt);
+            float sin_t = sin(camera_tilt);
+            math::Matrix4 rotation_heading(
+                cos_h, 0.0f, sin_h, 0.0f,
+                0.0f, 1.0f, 0.0f, 0.0f,
+                -sin_h, 0.0f, cos_h, 0.0f,
+                0.0f, 0.0f, 0.0f, 1.0f
+                );
+            math::Matrix4 rotation_tilt(
+                1.0f, 0.0f, 0.0f, 0.0f,
+                0.0f, cos_t, -sin_t, 0.0f,
+                0.0f, sin_t, cos_t, 0.0f,
+                0.0f, 0.0f, 0.0f, 1.0f
+                );
+            view_matrix *= math::Translate(0.0f, 0.0f, camera_distance);
+            view_matrix *= rotation_tilt;
+            view_matrix *= rotation_heading;
+            view_matrix *= math::Translate(0.0f, -center_height, 0.0f);
+        }
+        else
+        {
+            float cos_t = cos(camera_tilt);
+            float sin_t = sin(camera_tilt);
+            float alpha = atan( (2.0f * mTerrainView->getAnchorRatioX() - 1.0f) * tan(0.5f * mFovX) );
+            float beta  = atan( (2.0f * mTerrainView->getAnchorRatioY() - 1.0f) * tan(0.5f * mFovY) );
+            float v = camera_distance * cos_t -
+                (camera_distance * sin_t * tan(math::kHalfPi - beta - camera_tilt));
+            float tx = camera_distance * tan(alpha);
+            float gamma = atan(tx/(std::abs(v) + camera_distance * cos_t));
+
+            float heading = camera_heading - gamma;
+            float cos_h = cos(heading);
+            float sin_h = sin(heading);
+            math::Matrix4 rotation_heading(
+                cos_h, 0.0f, sin_h, 0.0f,
+                0.0f, 1.0f, 0.0f, 0.0f,
+                -sin_h, 0.0f, cos_h, 0.0f,
+                0.0f, 0.0f, 0.0f, 1.0f
+                );
+            math::Matrix4 rotation_tilt(
+                1.0f, 0.0f, 0.0f, 0.0f,
+                0.0f, cos_t, -sin_t, 0.0f,
+                0.0f, sin_t, cos_t, 0.0f,
+                0.0f, 0.0f, 0.0f, 1.0f
+                );
+            view_matrix *= math::Translate(tx, -v * sin_t, camera_distance - v * cos_t);
+            view_matrix *= rotation_tilt;
+            view_matrix *= rotation_heading;
+            view_matrix *= math::Translate(0.0f, -center_height, 0.0f);
+        }
+        return view_matrix;
     }
     void Renderer::IntersectionWithRay(const math::Vector3& ray, math::Vector3& intersection) const
     {

@@ -35,16 +35,19 @@ namespace mgn {
             }
             return NULL;
         }
-        void MercatorNodePool::Push(MercatorNode * node)
+        MercatorNode * MercatorNodePool::Push(MercatorNode * node)
         {
             if (size_ == capacity_)
             {
                 // Erase the oldest one
+                MercatorNode * erased_node = nodes_[0];
                 --size_;
                 memmove(nodes_, nodes_ + 1, size_ * sizeof(MercatorNode*));
+                return erased_node;
             }
             nodes_[size_] = node;
             ++size_;
+            return NULL;
         }
 
     } // namespace terrain

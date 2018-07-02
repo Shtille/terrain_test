@@ -14,7 +14,7 @@ namespace mgn {
                 graphics::Shader * shader);
             virtual ~RouteBeginRenderer();
 
-            void Update(mgnMdTerrainProvider * provider);
+            void Update(MercatorProvider * provider);
         };
 
     } // namespace terrain

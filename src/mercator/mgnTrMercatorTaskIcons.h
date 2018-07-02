@@ -6,6 +6,8 @@
 
 #include "mgnTrMercatorDataInfo.h"
 
+class mgnMdWorldPosition;
+
 namespace mgn {
     namespace terrain {
 
@@ -14,7 +16,8 @@ namespace mgn {
         //! Icons task class
         class IconsTask : public Task {
         public:
-            IconsTask(MercatorNode * node, MercatorProvider * provider);
+            IconsTask(MercatorNode * node, MercatorProvider * provider,
+                const mgnMdWorldPosition * gps_position);
             ~IconsTask();
 
             void Execute(); /* override */
@@ -22,6 +25,7 @@ namespace mgn {
 
         private:
             MercatorProvider * provider_;
+            const mgnMdWorldPosition * gps_position_;
             std::vector<IconData> icons_data_;
             bool has_errors_;
         };

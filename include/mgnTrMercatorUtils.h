@@ -15,6 +15,8 @@ namespace Mercator
     void QuadkeyToTileXY(const std::string& quadkey, int& tile_x, int& tile_y, int& level_of_detail);
 
     int GetOptimalLevelOfDetail(double screen_pixel_size_x, int min_lod, int max_lod);
+
+    double GetNativeScale(int level_of_detail);
 }
 
 #endif

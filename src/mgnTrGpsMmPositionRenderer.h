@@ -4,10 +4,11 @@
 #include "mgnTrMesh.h"
 
 class mgnMdTerrainView;
-class mgnMdTerrainProvider;
 
 namespace mgn {
     namespace terrain {
+
+        class MercatorProvider;
 
         //! GPS map matching position renderer class
         class GpsMmPositionRenderer : private Mesh
@@ -17,7 +18,7 @@ namespace mgn {
                 graphics::Shader * shader);
             virtual ~GpsMmPositionRenderer();
 
-            void Update(mgnMdTerrainProvider * provider);
+            void Update(MercatorProvider * provider);
             void Render();
 
         private:
@@ -26,14 +27,13 @@ namespace mgn {
             void CreateTexture();
 
             mgnMdTerrainView * mTerrainView;
+            graphics::Shader * mShader;
             vec3 mGpsPosition;
             vec3 mMmPosition;
             float mScale;
             vec3 mGpsColor;
             vec3 mMmColor;
             bool mExists;
-
-            graphics::Shader * mShader;
         };
 
     } // namespace terrain

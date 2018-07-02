@@ -421,6 +421,30 @@
 				>
 			</File>
 			<File
+				RelativePath=".\src\mgnTrGpsMmPositionRenderer.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\src\mgnTrGpsMmPositionRenderer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\src\mgnTrGuidanceArrowRenderer.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\src\mgnTrGuidanceArrowRenderer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\src\mgnTrIcon.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\src\mgnTrIcon.h"
+				>
+			</File>
+			<File
 				RelativePath=".\src\mgnTrLabel.cpp"
 				>
 			</File>
@@ -438,6 +462,38 @@
 			</File>
 			<File
 				RelativePath=".\src\mgnTrRenderer.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\src\mgnTrRouteBeginRenderer.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\src\mgnTrRouteBeginRenderer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\src\mgnTrRouteEndRenderer.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\src\mgnTrRouteEndRenderer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\src\mgnTrRoutePointRenderer.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\src\mgnTrRoutePointRenderer.h"
+				>
+			</File>
+			<File
+				RelativePath=".\src\mgnTrVehicleRenderer.cpp"
+				>
+			</File>
+			<File
+				RelativePath=".\src\mgnTrVehicleRenderer.h"
 				>
 			</File>
 			<Filter
@@ -529,6 +585,22 @@
 				</File>
 				<File
 					RelativePath=".\src\mercator\mgnTrMercatorTaskTexture.h"
+					>
+				</File>
+				<File
+					RelativePath=".\src\mercator\mgnTrMercatorTaskTextureLabels.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\src\mercator\mgnTrMercatorTaskTextureLabels.h"
+					>
+				</File>
+				<File
+					RelativePath=".\src\mercator\mgnTrMercatorTileContext.cpp"
+					>
+				</File>
+				<File
+					RelativePath=".\src\mercator\mgnTrMercatorTileContext.h"
 					>
 				</File>
 				<File

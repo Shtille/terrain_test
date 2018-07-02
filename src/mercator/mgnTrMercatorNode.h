@@ -37,6 +37,7 @@ namespace mgn {
             int y() const;
 
             const float GetPriority() const;
+            const mgnMdTerrainView * terrain_view() const;
 
             bool IsSplit();
 
@@ -59,6 +60,8 @@ namespace mgn {
             void OnTextureTaskCompleted(const graphics::Image& image, bool has_errors);
             void OnHeightmapTaskCompleted(const graphics::Image& image, bool has_errors);
             void OnLabelsTaskCompleted(const std::vector<LabelData>& labels_data, bool has_errors);
+            void OnTextureLabelsTaskCompleted(const graphics::Image& image,
+                const std::vector<LabelData>& labels_data, bool has_errors);
             void OnIconsTaskCompleted(const std::vector<IconData>& icons_data, bool has_errors);
 
         protected:

@@ -34,7 +34,7 @@ namespace {
 namespace mgn {
     namespace terrain {
 
-        MercatorTree::MercatorTree(graphics::Renderer * renderer,
+        MercatorCollection::MercatorCollection(graphics::Renderer * renderer,
             graphics::Shader * shader, graphics::Shader * billboard_shader, const Font * font,
             math::Frustum * frustum, mgnMdTerrainView * terrain_view,
             MercatorProvider * provider, const mgnMdWorldPosition * gps_position)
@@ -70,7 +70,7 @@ namespace mgn {
             debug_info_.maximum_achieved_lod = 0;
 #endif
         }
-        MercatorTree::~MercatorTree()
+        MercatorCollection::~MercatorCollection()
         {
             delete root_;
             root_ = NULL;
@@ -114,7 +114,7 @@ namespace mgn {
             delete service_; // should be deleted after faces are done
             service_ = NULL;
         }
-        bool MercatorTree::Initialize(float fovy_in_radians, int screen_height)
+        bool MercatorCollection::Initialize(float fovy_in_radians, int screen_height)
         {
             // Create tile mesh
             tile_->Create();
@@ -158,7 +158,60 @@ namespace mgn {
             // Create font for labels rendering
             return true;
         }
-        void MercatorTree::Update()
+        void MercatorCollection::FillRenderedKeys()
+        {
+            // Determine current node
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+            int lod = terrain_view_->GetLod();
+            float tiles_per_side = static_cast<float>(1 << lod);
+            int x = static_cast<int>((lod_params_.camera_position.x / kMSM) * tiles_per_side);
+            int y = static_cast<int>((kMSM - lod_params_.camera_position.y / kMSM) * tiles_per_side);
+
+            /*
+            y
+            |
+            6 5 4
+            7 0 3
+            8 1 2 _ x
+            */
+
+            // Fill keys
+            rendered_keys_.clear();
+            rendered_keys_.push_back(MercatorNodeKey(lod, x  , y  ));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x  , y-1));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x+1, y-1));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x+1, y  ));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x+1, y+1));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x  , y+1));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x-1, y+1));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x-1, y  ));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x-1, y-1));
+        }
+        void MercatorCollection::PrepareNodes()
+        {
+            rendered_nodes_.clear();
+            for (std::vector<MercatorNodeKey>::const_iterator it = rendered_keys_.begin();
+                it != rendered_keys_.end(); ++it)
+            {
+                const MercatorNodeKey& key = *it;
+                MercatorNode * node;
+                AllocatedNodes::iterator ait = allocated_nodes_.find(key);
+                if (ait == allocated_nodes_.end()) // hasn't been allocated yet
+                {
+                    node = new MercatorNode(this);
+                    node->lod_ = key.lod;
+                    node->x_ = key.x;
+                    node->y_ = key.y;
+                    allocated_nodes_.insert(std::make_pair(key, node));
+                }
+                else
+                {
+                    node = ait->second;
+                }
+                rendered_nodes_.push_back(node);
+            }
+        }
+        void MercatorCollection::Update()
         {
             // Update LOD state.
             if (!lod_freeze_)
@@ -168,13 +221,6 @@ namespace mgn {
                 terrain_view_->LocalToPixel(terrain_view_->getCamPosition(), cam_position_pixel, kMSM);
                 lod_params_.camera_position = cam_position_pixel;
                 lod_params_.camera_front = frustum_->getDir();
-            }
-
-            // Preprocess tree for the first time
-            if (preprocess_)
-            {
-                PreprocessTree();
-                preprocess_ = false;
             }
 
             // Handle delayed requests (for rendering new tiles).
@@ -188,19 +234,32 @@ namespace mgn {
                 // Update LOD requests.
                 HandleInlineRequests();
             }
-        }
-        void MercatorTree::Render()
-        {
-            rendered_nodes_.clear();
 
+            FillRenderedKeys();
+            PrepareNodes();
+        }
+        void MercatorCollection::Render()
+        {
             shader_->Bind();
-            if (root_->WillRender())
-                root_->Render();
+            if (is_collection_)
+            {
+                for (std::vector<MercatorNode*>::const_iterator it = rendered_nodes_.begin();
+                    it != rendered_nodes_.end(); ++it)
+                {
+                    MercatorNode * node = *it;
+                    node->Render();
+                }
+            }
+            else
+            {
+                if (root_->WillRender())
+                    root_->Render();
+            }
             shader_->Unbind();
 
             ++frame_counter_;
         }
-        void MercatorTree::RenderLabels()
+        void MercatorCollection::RenderLabels()
         {
             renderer_->DisableDepthTest();
 
@@ -246,7 +305,7 @@ namespace mgn {
         private:
             vec3 camera_position_; //!< camera position in local cs
         };
-        void MercatorTree::UpdateIconList()
+        void MercatorCollection::UpdateIconList()
         {
             // TODO: lock needed for selection requests
             //mgnCriticalSectionScopedEntrance guard(mIconListCriticalSection);
@@ -272,7 +331,7 @@ namespace mgn {
             // This is the weakest part, complexity is O(n*log(n))
             std::sort(icons_list_.begin(), icons_list_.end(), IconDistanceCompareFunctor(terrain_view_));
         }
-        void MercatorTree::SplitQuadTreeNode(MercatorNode* node)
+        void MercatorCollection::SplitQuadTreeNode(MercatorNode* node)
         {
             // Parent is no longer an open node, now has at least one child.
             if (node->parent_)
@@ -289,7 +348,7 @@ namespace mgn {
                 debug_info_.maximum_achieved_lod = node->lod_ + 1;
 #endif
         }
-        void MercatorTree::MergeQuadTreeNode(MercatorNode* node)
+        void MercatorCollection::MergeQuadTreeNode(MercatorNode* node)
         {
             // Delete children.
             for (int i = 0; i < 4; ++i)
@@ -313,7 +372,7 @@ namespace mgn {
                 open_nodes_.insert(node->parent_);
             }
         }
-        void MercatorTree::Request(MercatorNode* node, int type, bool priority)
+        void MercatorCollection::Request(MercatorNode* node, int type, bool priority)
         {
             RequestQueue& request_queue = (type == REQUEST_MAPTILE) ? render_requests_ : inline_requests_;
             if (priority)
@@ -321,7 +380,7 @@ namespace mgn {
             else
                 request_queue.push_back(RequestType(node, type));
         }
-        void MercatorTree::Unrequest(MercatorNode* node)
+        void MercatorCollection::Unrequest(MercatorNode* node)
         {
             // Remove node from queues
             RequestQueue* request_queues[] = { &render_requests_, &inline_requests_ };
@@ -354,16 +413,16 @@ namespace mgn {
             // Guess this is the best solution to make a cycle
             while (!service_->RemoveAllNodeTasks(node));
         }
-        void MercatorTree::HandleRequests(RequestQueue& requests)
+        void MercatorCollection::HandleRequests(RequestQueue& requests)
         {
             // Ensure we only use up x time per frame.
             int weights[] = { 10, 10, 1, 2 };
-            bool(MercatorTree::*handlers[4])(MercatorNode*) =
+            bool(MercatorCollection::*handlers[4])(MercatorNode*) =
             {
-                &MercatorTree::HandleRenderable,
-                &MercatorTree::HandleMapTile,
-                &MercatorTree::HandleSplit,
-                &MercatorTree::HandleMerge
+                &MercatorCollection::HandleRenderable,
+                &MercatorCollection::HandleMapTile,
+                &MercatorCollection::HandleSplit,
+                &MercatorCollection::HandleMerge
             };
             int limit = 1000;
             bool sorted = false;
@@ -398,7 +457,7 @@ namespace mgn {
                 }
             }
         }
-        void MercatorTree::HandleRenderRequests()
+        void MercatorCollection::HandleRenderRequests()
         {
             // Process task that have been done on a service thread
             if (!preprocess_)
@@ -407,11 +466,11 @@ namespace mgn {
             // Then handle requests
             HandleRequests(render_requests_);
         }
-        void MercatorTree::HandleInlineRequests()
+        void MercatorCollection::HandleInlineRequests()
         {
             HandleRequests(inline_requests_);
         }
-        bool MercatorTree::HandleRenderable(MercatorNode* node)
+        bool MercatorCollection::HandleRenderable(MercatorNode* node)
         {
             // Determine max relative LOD depth between grid and tile
             int maxLODRatio = GetTileResolution() / (grid_size_ - 1);
@@ -456,7 +515,7 @@ namespace mgn {
             node->request_renderable_ = false;
             return true;
         }
-        bool MercatorTree::HandleMapTile(MercatorNode* node)
+        bool MercatorCollection::HandleMapTile(MercatorNode* node)
         {
             // Assemble a map tile object for this node.
             node->request_map_tile_ = false;
@@ -504,7 +563,7 @@ namespace mgn {
                 return false;
             }
         }
-        bool MercatorTree::HandleSplit(MercatorNode* node)
+        bool MercatorCollection::HandleSplit(MercatorNode* node)
         {
             if (node->lod_ < GetMaxLod())
             {
@@ -517,13 +576,13 @@ namespace mgn {
             }
             return true;
         }
-        bool MercatorTree::HandleMerge(MercatorNode* node)
+        bool MercatorCollection::HandleMerge(MercatorNode* node)
         {
             MergeQuadTreeNode(node);
             node->request_merge_ = false;
             return true;
         }
-        void MercatorTree::PruneTree()
+        void MercatorCollection::PruneTree()
         {
             NodeHeap heap;
 
@@ -559,7 +618,7 @@ namespace mgn {
                 }
             }
         }
-        void MercatorTree::RefreshMapTile(MercatorNode* node, MercatorMapTile* old_tile, MercatorMapTile* new_tile)
+        void MercatorCollection::RefreshMapTile(MercatorNode* node, MercatorMapTile* old_tile, MercatorMapTile* new_tile)
         {
             for (int i = 0; i < 4; ++i)
             {
@@ -574,7 +633,7 @@ namespace mgn {
                 }
             }
         }
-        void MercatorTree::FlushMapTileToRoot(MercatorNode* node)
+        void MercatorCollection::FlushMapTileToRoot(MercatorNode* node)
         {
             for (int i = 0; i < 4; ++i)
             {
@@ -588,7 +647,7 @@ namespace mgn {
                 }
             }
         }
-        void MercatorTree::ProcessDoneTasks()
+        void MercatorCollection::ProcessDoneTasks()
         {
             MercatorService::TaskList done_tasks;
             if (service_->GetDoneTasks(done_tasks))
@@ -604,7 +663,7 @@ namespace mgn {
                 }
             }
         }
-        void MercatorTree::PreprocessTree()
+        void MercatorCollection::PreprocessTree()
         {
             do
             {
@@ -621,7 +680,7 @@ namespace mgn {
             // And sort tasks queue in service
             service_->SortTasks();
         }
-        void MercatorTree::RequestTexture(MercatorNode* node)
+        void MercatorCollection::RequestTexture(MercatorNode* node)
         {
             if (!node->request_albedo_)
             {
@@ -632,7 +691,7 @@ namespace mgn {
                     service_->AddTask(new TextureLabelsTask(node, provider_));
             }
         }
-        void MercatorTree::RequestHeightmap(MercatorNode* node)
+        void MercatorCollection::RequestHeightmap(MercatorNode* node)
         {
             if (!node->request_heightmap_)
             {
@@ -640,7 +699,7 @@ namespace mgn {
                 service_->AddTask(new HeightmapTask(node, provider_));
             }
         }
-        void MercatorTree::RequestLabels(MercatorNode* node)
+        void MercatorCollection::RequestLabels(MercatorNode* node)
         {
             if (!node->request_labels_)
             {
@@ -648,7 +707,7 @@ namespace mgn {
                 service_->AddTask(new LabelsTask(node, provider_));
             }
         }
-        void MercatorTree::RequestIcons(MercatorNode* node)
+        void MercatorCollection::RequestIcons(MercatorNode* node)
         {
             if (!node->request_icons_)
             {
@@ -656,31 +715,21 @@ namespace mgn {
                 service_->AddTask(new IconsTask(node, provider_, gps_position_));
             }
         }
-        const int MercatorTree::grid_size() const
+        const int MercatorCollection::grid_size() const
         {
             return grid_size_;
         }
-        int MercatorTree::GetFrameCounter() const
+        int MercatorCollection::GetFrameCounter() const
         {
             return frame_counter_;
         }
-        const bool MercatorTree::IsUsingPool()
+        const bool MercatorCollection::IsUsingPool()
         {
             return true;
         }
-        bool MercatorTree::RequestComparePriority::operator()(const RequestType& a, const RequestType& b) const
+        bool MercatorCollection::RequestComparePriority::operator()(const RequestType& a, const RequestType& b) const
         {
             return (a.node->GetPriority() > b.node->GetPriority());
-        }
-        bool TaskNodeCompareFunctor::operator()(Task * task1, Task * task2) const
-        {
-            // Textures have first priority for fetch
-            if (task1->type() != task2->type())
-                return task1->type() < task2->type(); // texture over other requests
-            else if (task1->node()->lod() != task2->node()->lod())
-                return task1->node()->lod() < task2->node()->lod(); // lower LOD priority
-            else
-                return task1->node()->GetPriority() > task2->node()->GetPriority();
         }
 
     } // namespace terrain

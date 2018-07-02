@@ -65,6 +65,7 @@ private:
     float mAnchorRatioX; //!< Anchor position ratio X in [0; 1], from top to bottom
     float mAnchorRatioY; //!< Anchor position ratio Y in [0; 1], from left to right
     bool mPanMap;        //!< are we panning map or not?
+    bool mIs3D;
 
     float mPixelScale;  //!< Pixel scale
 
@@ -133,6 +134,9 @@ public:
 
     int GetLod() const;
 
+    void Set3D(bool is3D);
+    bool Is3D() const;
+
     // Attendant parameters
     unsigned short getMagIndex  () const;
     double getMagnitude         () const;
@@ -142,8 +146,11 @@ public:
     // Related MapDraw parameters
     int    getMapScaleIndex     () const;
     float  getMapScaleFactor    () const;
-    int    getMapScaleIndex     (unsigned short magIndex) const;
-    float  getMapScaleFactor    (unsigned short magIndex) const;
+    int    getMapScaleIndex     (unsigned short magIndex) const; // TODO: remove
+    float  getMapScaleFactor    (unsigned short magIndex) const; // TODO: remove
+
+    int GetMapScaleIndex(int level_of_detail) const;
+    float GetMapScaleFactor(int level_of_detail) const;
 
     void setTerrainProvider(mgnMdTerrainProvider * provider);
     void setPixelScale(float pixel_scale);
@@ -165,8 +172,11 @@ public:
     void PixelLocation(vec3& pixel, float map_size_max) const;
 
     void WorldToPixel(double latitude, double longitude, double altitude, vec3& pixel, float map_size_max) const;
+    void PixelToWorld(float pixel_x, float pixel_y, mgnMdWorldPoint& world_point, float map_size_max) const;
+    void PixelToLocal(const vec3& pixel, vec3& local, float map_size_max) const;
 
     void IntersectionWithRay(const vec3& ray, vec3& intersection) const;
+    void IntersectionWithRayPixel(const vec3& ray, vec3& intersection) const;
 
     //####################################################################################
     //      UTILITES

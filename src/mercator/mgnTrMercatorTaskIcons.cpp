@@ -2,13 +2,16 @@
 
 #include "mgnTrMercatorNode.h"
 #include "mgnTrMercatorProvider.h"
+#include "mgnTrMercatorTileContext.h"
 
 namespace mgn {
     namespace terrain {
 
-        IconsTask::IconsTask(MercatorNode * node, MercatorProvider * provider)
+        IconsTask::IconsTask(MercatorNode * node, MercatorProvider * provider,
+            const mgnMdWorldPosition * gps_position)
         : Task(node, REQUEST_ICONS)
         , provider_(provider)
+        , gps_position_(gps_position)
         , has_errors_(false)
         {
         }
@@ -24,7 +27,11 @@ namespace mgn {
             icons_info.icons_data = &icons_data_;
             icons_info.errors_occured = false;
 
-            provider_->GetIcons(icons_info);
+            const mgnMdTerrainView * terrain_view = node_->terrain_view();
+            MercatorTileContext context(terrain_view, gps_position_,
+                node_->x(), node_->y(), node_->lod());
+
+            provider_->GetIcons(icons_info, context);
 
             has_errors_ = icons_info.errors_occured;
         }

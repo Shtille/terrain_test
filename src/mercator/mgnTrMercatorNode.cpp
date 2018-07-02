@@ -146,6 +146,10 @@ namespace mgn {
             }
             return renderable_.GetLodPriority();
         }
+        const mgnMdTerrainView * MercatorNode::terrain_view() const
+        {
+            return owner_->terrain_view_;
+        }
         bool MercatorNode::IsSplit()
         {
             return children_[0] || children_[1] || children_[2] || children_[3];
@@ -196,7 +200,12 @@ namespace mgn {
             {
                 if (use_pool)
                 {
-                    owner_->node_pool_->Push(child);
+                    MercatorNode * dropped_node = owner_->node_pool_->Push(child);
+                    if (dropped_node != NULL) // pool is full
+                    {
+                        // We should cleanup dropped nodes
+                        delete dropped_node;
+                    }
                     // Some unloading stuff
                     child->OnDetach();
                 }
@@ -451,6 +460,8 @@ namespace mgn {
             if (owner_->preprocess_)
                 return;
 
+            owner_->rendered_nodes_.push_back(this);
+
             graphics::Shader * shader = owner_->shader_;
 
             // Vertex shader
@@ -462,8 +473,6 @@ namespace mgn {
             renderable_.GetMapTile()->BindTexture();
             owner_->tile_->Render();
             owner_->renderer_->ChangeTexture(NULL, 1U);
-
-            owner_->rendered_nodes_.push_back(this);
         }
         void MercatorNode::RenderLabels()
         {
@@ -591,10 +600,79 @@ namespace mgn {
             }
             has_labels_ = true;
         }
+        void MercatorNode::OnTextureLabelsTaskCompleted(const graphics::Image& image,
+            const std::vector<LabelData>& labels_data, bool has_errors)
+        {
+            OnTextureTaskCompleted(image, has_errors);
+            OnLabelsTaskCompleted(labels_data, has_errors);
+        }
         void MercatorNode::OnIconsTaskCompleted(const std::vector<IconData>& icons_data, bool has_errors)
         {
-            // TODO
+            // Precision is equal to 2 pixels in chosen LOD (in degrees)
+            const double kPrecision = 2.0 * 360.0 / static_cast<double>(256 << lod_);
+            for (std::vector<IconData>::const_iterator it = icons_data.begin(); it != icons_data.end(); ++it)
+            {
+                const IconData & data = *it;
+
+                // Filter out duplicates (POIs that stand in the same position)
+                bool has_duplicate = false;
+                std::vector<IconData>::const_iterator dit = it; ++dit;
+                for (; dit != icons_data.end(); ++dit)
+                {
+                    const IconData & other_data = *dit;
+                    if (fabs(data.latitude - other_data.latitude) < kPrecision &&
+                        fabs(data.longitude - other_data.longitude) < kPrecision) // the same position
+                    {
+                        has_duplicate = true;
+                        break;
+                    }
+                }
+                if (has_duplicate)
+                    continue;
+
+                size_t bitmap_hash = data.hash;
+
+                MercatorTree::IconTextureCache::iterator it_cache = owner_->icon_texture_cache_.find(bitmap_hash);
+                if (it_cache != owner_->icon_texture_cache_.end()) // texture with this ID exists in cache
+                {
+                    graphics::Texture * texture = it_cache->second;
+                    Icon *icon = new Icon(owner_->renderer_, owner_->terrain_view_,
+                        owner_->billboard_shader_, data, lod_);
+                    icon->setTexture(texture, false);
+                    point_user_meshes_.push_back(icon);
+                    continue;
+                }
+
+                // Rescale image if it's not power of two 
+                // (thus generateMipmaps isn't working on iOS devices with NPOT textures)
+                graphics::Texture * texture = NULL;
+                int new_width, new_height;
+                std::vector<unsigned char> new_data;
+                if (MakePotTextureFromNpot(data.width, data.height, data.bitmap_data,
+                                           new_width, new_height, new_data))
+                {
+                    const unsigned char * udata = & new_data[0];
+                    owner_->renderer_->CreateTextureFromData(texture, new_width, new_height,
+                        graphics::Image::Format::kRGBA8, graphics::Texture::Filter::kTrilinear, udata);
+                }
+                else
+                {
+                    const unsigned char * udata = & data.bitmap_data[0];
+                    owner_->renderer_->CreateTextureFromData(texture, data.width, data.height,
+                        graphics::Image::Format::kRGBA8, graphics::Texture::Filter::kTrilinear, udata);
+                }
+                
+                owner_->icon_texture_cache_.insert(std::make_pair<size_t, graphics::Texture*>(bitmap_hash, texture));
+                
+                Icon *icon = new Icon(owner_->renderer_, owner_->terrain_view_,
+                    owner_->billboard_shader_, data, lod_);
+                icon->setTexture(texture, false); // cache owns texture
+                point_user_meshes_.push_back(icon);
+            }
             has_icons_ = true;
+
+            // Finally update icons list
+            owner_->UpdateIconList();
         }
         void MercatorNode::OnAttach()
         {
@@ -613,8 +691,8 @@ namespace mgn {
                 owner_->RequestLabels(this);
 
             // Request icons load
-            // if (!has_icons_)
-            //     owner_->RequestIcons(this);
+            if (!has_icons_)
+                owner_->RequestIcons(this);
         }
         void MercatorNode::UnloadData()
         {
@@ -637,6 +715,8 @@ namespace mgn {
                     delete *it;
                 point_user_meshes_.clear();
                 has_icons_ = false;
+                // Need to flush icons list
+                owner_->UpdateIconList();
             }
         }
 

@@ -1,8 +1,9 @@
 #include "mgnTrGuidanceArrowRenderer.h"
+
 #include "mgnTrConstants.h"
+#include "mgnTrMercatorProvider.h"
 
 #include "mgnMdTerrainView.h"
-#include "mgnMdTerrainProvider.h"
 
 #include "mgnMdWorldPoint.h"
 #include "mgnMdIUserDataDrawContext.h"
@@ -38,6 +39,8 @@ namespace mgn {
         , shader_(shader)
         , gps_pos_(gps_pos)
         , position_()
+        , latitude_(0.0)
+        , longitude_(0.0)
         , heading_(0.0f)
         , scale_(1.0f)
         , line_width_(1.0f)
@@ -67,24 +70,25 @@ namespace mgn {
             float alpha = atan(size()/distance_to_camera);
             line_width_ = (2.0f * alpha / fovx) * kLineCoeff;
         }
-        void GuidanceArrowRenderer::Update(mgnMdTerrainProvider * provider)
+        void GuidanceArrowRenderer::Update(MercatorProvider * provider)
         {
             float cam_dist = (float)terrain_view_->getCamDistance();
 
-            GeoGuidanceArrow arrow;
+            MercatorProvider::GuidanceArrow arrow;
             float scale = std::max(cam_dist * 0.01f, 1.0f);
-            arrow.distance = scale * 20.0f;
+            arrow.distance = scale * 20.0f; // distance should be in meters
             ArrowPathContext context(terrain_view_, gps_pos_);
-            if (provider->fetchGuidanceArrow(context, arrow) && terrain_view_->getMagIndex() < 5)
+            if (provider->FetchGuidanceArrow(context, arrow) && terrain_view_->getMagIndex() < 5)
             {
+                const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+
                 exists_ = true;
-                double local_x, local_y;
-                terrain_view_->WorldToLocal(mgnMdWorldPoint(arrow.point.mLatitude, arrow.point.mLongitude), 
-                    local_x, local_y);
-                position_.x = (float)local_x;
-                position_.z = (float)local_y;
-                position_.y = (float)provider->getAltitude(arrow.point.mLatitude, arrow.point.mLongitude);
-                scale_ = scale;
+
+                latitude_ = arrow.point.mLatitude;
+                longitude_ = arrow.point.mLongitude;
+                double altitude = provider->GetAltitude(latitude_, longitude_);
+                terrain_view_->WorldToPixel(latitude_, longitude_, altitude, position_, kMSM);
+                terrain_view_->LocalToPixelDistance(scale, scale_, kMSM);
                 heading_ = arrow.heading;
                 // Finally
                 CalcRotation(provider);
@@ -301,27 +305,32 @@ namespace mgn {
             // 2. Map it into video memory
             renderer_->AddIndexBuffer(index_buffers_[1], num_indices, index_size, indices, graphics::BufferUsage::kStaticDraw);
         }
-        void GuidanceArrowRenderer::CalcRotation(mgnMdTerrainProvider * provider)
+        void GuidanceArrowRenderer::CalcRotation(MercatorProvider * provider)
         {
             float dxm = ((float)terrain_view_->getMagnitude())/111111.0f;
             need_rotation_matrix_ = dxm <= 0.05f;
             if (!need_rotation_matrix_)
                 return;
 
+            const float kMSM = static_cast<float>(GetMapSizeMax());
+            const int lod = terrain_view_->GetLod();
+            const float kTileSize = static_cast<float>(GetMapSizeMax() / (1 << lod));
+            const float kCellSize = kTileSize / static_cast<float>(GetHeightmapWidth());
+            float cell_size_local;
+            terrain_view_->PixelToLocalDistance(kCellSize, cell_size_local, kMSM);
+
             // Code taken from DottedLineRenderer
-            mgnMdWorldPoint world_point;
-            terrain_view_->LocalToWorld(position_.x, position_.z, world_point);
             
             // Fast, but inaccurate computation
-            double d = terrain_view_->getCellSizeLat()/double(GetTileHeightSamples()-1);
+            double d = static_cast<double>(cell_size_local);
             double dlon = d / terrain_view_->getMetersPerLongitude();
             double dlat = d / terrain_view_->getMetersPerLatitude();
             float sx =      
-                (float)provider->getAltitude(world_point.mLatitude, world_point.mLongitude + dlon, dxm) - // x+1
-                (float)provider->getAltitude(world_point.mLatitude, world_point.mLongitude - dlon, dxm);  // x-1
+                (float)provider->GetAltitude(latitude_, longitude_ + dlon, NULL, dxm) - // x+1
+                (float)provider->GetAltitude(latitude_, longitude_ - dlon, NULL, dxm);  // x-1
             float sy =      
-                (float)provider->getAltitude(world_point.mLatitude + dlat, world_point.mLongitude, dxm) - // y+1
-                (float)provider->getAltitude(world_point.mLatitude - dlat, world_point.mLongitude, dxm);  // y-1
+                (float)provider->GetAltitude(latitude_ + dlat, longitude_, NULL, dxm) - // y+1
+                (float)provider->GetAltitude(latitude_ - dlat, longitude_, NULL, dxm);  // y-1
             // assume that tile cell sizes in both directions are the same
             // also swap x and z to convert LHS normal to RHS
             vec3 normal;

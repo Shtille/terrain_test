@@ -1,5 +1,6 @@
 #include "mgnTrIcon.h"
 #include "mgnTrConstants.h"
+#include "mgnTrMercatorDataInfo.h"
 
 #include "mgnMdTerrainProvider.h"
 #include "mgnMdTerrainView.h"
@@ -12,13 +13,13 @@ namespace mgn {
     namespace terrain {
 
         Icon::Icon(mgn::graphics::Renderer * renderer, mgnMdTerrainView * terrain_view,
-                graphics::Shader * shader, const PointUserObjectInfo &pui, unsigned short magIndex)
+                graphics::Shader * shader, const IconData& data, int lod)
         : Billboard(renderer, terrain_view, shader, 0.001f)
-        , mID(pui.id)
-        , mMapObjectInfo(pui.poi_info)
-        , mIsPOI(pui.is_poi)
+        , mID(data.id)
+        , mMapObjectInfo(data.poi_info)
+        , mIsPOI(data.is_poi)
         {
-            Create(pui, magIndex);
+            Create(data, lod);
             MakeRenderable();
         }
         Icon::~Icon()
@@ -38,11 +39,14 @@ namespace mgn {
         }
         void Icon::GetIconSize(vec2& size)
         {
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+
             vec4 world_position(mPosition, 1.0f);
             vec4 pos_eye = renderer_->view_matrix() * world_position;
 
             float icon_distance = pos_eye.z;
-            float base_distance = (float)mTerrainView->getCamDistance();
+            float base_distance;
+            mTerrainView->LocalToPixelDistance((float)mTerrainView->getCamDistance(), base_distance, kMSM);
             float scale = icon_distance;
             if (icon_distance > base_distance)
                 scale = std::max(base_distance, 0.8f * icon_distance);
@@ -52,6 +56,8 @@ namespace mgn {
         }
         void Icon::render()
         {
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+
             renderer_->ChangeTexture(mTexture);
 
             float tilt    = (float)mTerrainView->getCamTiltRad();
@@ -63,7 +69,8 @@ namespace mgn {
             mShader->Uniform1f("u_occlusion_distance", pos_eye.xyz().Length());
 
             float icon_distance = pos_eye.z;
-            float base_distance = (float)mTerrainView->getCamDistance();
+            float base_distance;
+            mTerrainView->LocalToPixelDistance((float)mTerrainView->getCamDistance(), base_distance, kMSM);
             // Near icons should have the same size as middle ones
             // Far icons shouldn't be less than 0.8 of the original size
             float scale = icon_distance;
@@ -98,12 +105,9 @@ namespace mgn {
 
             renderer_->PopMatrix();
         }
-        void Icon::Create(const PointUserObjectInfo &pui, unsigned short magIndex)
+        void Icon::Create(const IconData& data, int /*lod*/)
         {
-            const int kTileResolution = GetTileResolution();
-
-            float metersInPixelLat = (float)mTerrainView->getCellSizeLat(magIndex)/kTileResolution;
-            float metersInPixelLon = (float)mTerrainView->getCellSizeLon(magIndex)/kTileResolution;
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
 
             const math::Vector4& viewport = renderer_->viewport();
             float fovx = mTerrainView->getFovX();
@@ -111,17 +115,15 @@ namespace mgn {
             float size_koeff = tanf(fovx * 0.5f) * 2.0f * kScaleModifier;
             // Label size (in meters)
             const float screen_width = std::max(viewport.z, viewport.w);
-            float w = size_koeff * (float)pui.bmp->mWidth / screen_width;
-            float h = size_koeff * (float)pui.bmp->mHeight / screen_width;
+            float w = size_koeff * (float)data.width / screen_width;
+            float h = size_koeff * (float)data.height / screen_width;
 
-            mOrigin = (pui.centered) ? Billboard::kBottomMiddle : Billboard::kBottomLeft;
+            mOrigin = (data.centered) ? Billboard::kBottomMiddle : Billboard::kBottomLeft;
             mWidth = w;
             mHeight = h;
 
             // Coordinates of the middle-bottom point of label (relatively to tile center)
-            mPosition.x = metersInPixelLon*(float)pui.lon;
-            mPosition.y = (float)                 pui.alt;
-            mPosition.z = metersInPixelLat*(float)pui.lat;
+            mTerrainView->WorldToPixel(data.latitude, data.longitude, data.altitude, mPosition, kMSM);
 
             unsigned int vertex_size = 5 * sizeof(float);
             index_size_ = sizeof(unsigned short);
@@ -138,7 +140,7 @@ namespace mgn {
             // bottom-left
             {
                 // position
-                vertices[ind++] = pui.centered ? (-w/2.0f) : 0.0f;
+                vertices[ind++] = data.centered ? (-w/2.0f) : 0.0f;
                 vertices[ind++] = 0.0f;
                 vertices[ind++] = 0.0f;
                 // texture coordinates (0..1)
@@ -148,7 +150,7 @@ namespace mgn {
             // bottom-right
             {
                 // position
-                vertices[ind++] = pui.centered ? (w/2.0f) : w;
+                vertices[ind++] = data.centered ? (w/2.0f) : w;
                 vertices[ind++] = 0.0f;
                 vertices[ind++] = 0.0f;
                 // texture coordinates (0..1)
@@ -158,7 +160,7 @@ namespace mgn {
             // upper-left
             {
                 // position
-                vertices[ind++] = pui.centered ? (-w/2.0f) : 0.0f;
+                vertices[ind++] = data.centered ? (-w/2.0f) : 0.0f;
                 vertices[ind++] = h;
                 vertices[ind++] = 0.0f;
                 // texture coordinates (0..1)
@@ -168,7 +170,7 @@ namespace mgn {
             // upper-right
             {
                 // position
-                vertices[ind++] = pui.centered ? (w/2.0f) : w;
+                vertices[ind++] = data.centered ? (w/2.0f) : w;
                 vertices[ind++] = h;
                 vertices[ind++] = 0.0f;
                 // texture coordinates (0..1)

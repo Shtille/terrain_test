@@ -1,6 +1,113 @@
 #include "mgnTrVehicleRenderer.h"
 
+#include "mgnTrConstants.h"
 #include "mgnMdTerrainView.h"
+
+#include "mgnLog.h" // TEMP
+#include "MapDrawing/Graphics/mgnCommonMath.h"
+
+namespace {
+    struct Matrix4d {
+        Matrix4d()
+        {
+        }
+        explicit Matrix4d(const math::Matrix4& matrix)
+        {
+            for (int i = 0; i < 16; ++i)
+                sa[i] = static_cast<double>(matrix.sa[i]);
+        }
+        Matrix4d GetInverse() const
+        {
+            Matrix4d mat;
+            double p00 = a[2][2] * a[3][3];
+            double p01 = a[3][2] * a[2][3];
+            double p02 = a[2][1] * a[3][3];
+            double p03 = a[2][3] * a[3][1];
+            double p04 = a[2][1] * a[3][2];
+            double p05 = a[2][2] * a[3][1];
+            double p06 = a[2][0] * a[3][3];
+            double p07 = a[2][3] * a[3][0];
+            double p08 = a[2][0] * a[3][2];
+            double p09 = a[2][2] * a[3][0];
+            double p10 = a[2][0] * a[3][1];
+            double p11 = a[2][1] * a[3][0];
+
+            mat.a[0][0] = (p00 * a[1][1] + p03 * a[1][2] + p04 * a[1][3]) - (p01 * a[1][1] + p02 * a[1][2] + p05 * a[1][3]);
+            mat.a[1][0] = (p01 * a[1][0] + p06 * a[1][2] + p09 * a[1][3]) - (p00 * a[1][0] + p07 * a[1][2] + p08 * a[1][3]);
+            mat.a[2][0] = (p02 * a[1][0] + p07 * a[1][1] + p10 * a[1][3]) - (p03 * a[1][0] + p06 * a[1][1] + p11 * a[1][3]);
+            mat.a[3][0] = (p05 * a[1][0] + p08 * a[1][1] + p11 * a[1][2]) - (p04 * a[1][0] + p09 * a[1][1] + p10 * a[1][2]);
+            mat.a[0][1] = (p01 * a[0][1] + p02 * a[0][2] + p05 * a[0][3]) - (p00 * a[0][1] + p03 * a[0][2] + p04 * a[0][3]);
+            mat.a[1][1] = (p00 * a[0][0] + p07 * a[0][2] + p08 * a[0][3]) - (p01 * a[0][0] + p06 * a[0][2] + p09 * a[0][3]);
+            mat.a[2][1] = (p03 * a[0][0] + p06 * a[0][1] + p11 * a[0][3]) - (p02 * a[0][0] + p07 * a[0][1] + p10 * a[0][3]);
+            mat.a[3][1] = (p04 * a[0][0] + p09 * a[0][1] + p10 * a[0][2]) - (p05 * a[0][0] + p08 * a[0][1] + p11 * a[0][2]);
+
+            double q00 = a[0][2] * a[1][3];
+            double q01 = a[0][3] * a[1][2];
+            double q02 = a[0][1] * a[1][3];
+            double q03 = a[0][3] * a[1][1];
+            double q04 = a[0][1] * a[1][2];
+            double q05 = a[0][2] * a[1][1];
+            double q06 = a[0][0] * a[1][3];
+            double q07 = a[0][3] * a[1][0];
+            double q08 = a[0][0] * a[1][2];
+            double q09 = a[0][2] * a[1][0];
+            double q10 = a[0][0] * a[1][1];
+            double q11 = a[0][1] * a[1][0];
+
+            mat.a[0][2] = (q00 * a[3][1] + q03 * a[3][2] + q04 * a[3][3]) - (q01 * a[3][1] + q02 * a[3][2] + q05 * a[3][3]);
+            mat.a[1][2] = (q01 * a[3][0] + q06 * a[3][2] + q09 * a[3][3]) - (q00 * a[3][0] + q07 * a[3][2] + q08 * a[3][3]);
+            mat.a[2][2] = (q02 * a[3][0] + q07 * a[3][1] + q10 * a[3][3]) - (q03 * a[3][0] + q06 * a[3][1] + q11 * a[3][3]);
+            mat.a[3][2] = (q05 * a[3][0] + q08 * a[3][1] + q11 * a[3][2]) - (q04 * a[3][0] + q09 * a[3][1] + q10 * a[3][2]);
+            mat.a[0][3] = (q02 * a[2][2] + q05 * a[2][3] + q01 * a[2][1]) - (q04 * a[2][3] + q00 * a[2][1] + q03 * a[2][2]);
+            mat.a[1][3] = (q08 * a[2][3] + q00 * a[2][0] + q07 * a[2][2]) - (q06 * a[2][2] + q09 * a[2][3] + q01 * a[2][0]);
+            mat.a[2][3] = (q06 * a[2][1] + q11 * a[2][3] + q03 * a[2][0]) - (q10 * a[2][3] + q02 * a[2][0] + q07 * a[2][1]);
+            mat.a[3][3] = (q10 * a[2][2] + q04 * a[2][0] + q09 * a[2][1]) - (q08 * a[2][1] + q11 * a[2][2] + q05 * a[2][0]);
+
+            return mat * (1.0 / (a[0][0] * mat.a[0][0] + a[0][1] * mat.a[1][0] + a[0][2] * mat.a[2][0] + a[0][3] * mat.a[3][0]));
+        }
+        Matrix4d operator * (const double s)
+        {
+            Matrix4d mr;
+            for (int i = 0; i < 16; ++i)
+                mr.sa[i] = sa[i] * s;
+            return mr;
+        }
+        Matrix4d operator * (const Matrix4d &m2)
+        {
+            // we should i-row multiply by j-column
+            Matrix4d mr;
+            for (int i = 0; i < 4; ++i)
+                for (int j = 0; j < 4; ++j)
+                {
+                    mr.a[j][i] = a[0][i] * m2.a[j][0];
+                    mr.a[j][i] += a[1][i] * m2.a[j][1];
+                    mr.a[j][i] += a[2][i] * m2.a[j][2];
+                    mr.a[j][i] += a[3][i] * m2.a[j][3];
+                }
+                return mr;
+        }
+        math::Vector4 operator * (const math::Vector4 &v)
+        {
+            math::Vector4 res;
+            res.x = a[0][0] * (double)v.x + a[1][0] * (double)v.y + a[2][0] * (double)v.z + a[3][0] * (double)v.w;
+            res.y = a[0][1] * (double)v.x + a[1][1] * (double)v.y + a[2][1] * (double)v.z + a[3][1] * (double)v.w;
+            res.z = a[0][2] * (double)v.x + a[1][2] * (double)v.y + a[2][2] * (double)v.z + a[3][2] * (double)v.w;
+            res.w = a[0][3] * (double)v.x + a[1][3] * (double)v.y + a[2][3] * (double)v.z + a[3][3] * (double)v.w;
+            return res;
+        }
+        math::Matrix4 MatrixCast() const
+        {
+            math::Matrix4 mat;
+            for (int i = 0; i < 16; ++i)
+                mat.sa[i] = static_cast<float>(sa[i]);
+            return mat;
+        }
+        union {
+            double sa[16];
+            double a[4][4];
+        };
+    };
+}
 
 namespace mgn {
     namespace terrain {
@@ -41,17 +148,16 @@ namespace mgn {
         }
         void VehicleRenderer::Update()
         {
-            double vehicle_x, vehicle_y;
-            mgnMdWorldPoint world_point(mGpsPosition.mLatitude, mGpsPosition.mLongitude);
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
 
-            mTerrainView->WorldToLocal(world_point, vehicle_x, vehicle_y);
+            float cam_distance = (float)mTerrainView->getCamDistance();
+            mScale = std::max(cam_distance * 0.053f, 1.0f);
+            float delta_h = 0.0f;//0.2f * mScale;
+            if (delta_h < 1.0f) delta_h = 0.0f; // delta_h should be in meters
+            mTerrainView->LocalToPixelDistance(mScale, mScale, kMSM);
 
-            mScale = (float)std::max(mTerrainView->getCamDistance() * 0.053, 1.0);
-            float delta_h = 0.2f * mScale;
-            if (delta_h < 1.0f) delta_h = 0.0f;
-            mPosition.x = static_cast<float>(vehicle_x);
-            mPosition.y = static_cast<float>(mAltitude) + delta_h;
-            mPosition.z = static_cast<float>(vehicle_y);
+            mTerrainView->WorldToPixel(mGpsPosition.mLatitude, mGpsPosition.mLongitude, mAltitude + delta_h,
+                mPosition, kMSM);
         }
         void VehicleRenderer::Render()
         {
@@ -84,8 +190,34 @@ namespace mgn {
             renderer_->PushMatrix();
             renderer_->Translate(mPosition.x, dxm>0.05f ? 0.2f : mPosition.y, mPosition.z);
             renderer_->MultMatrix(rotation_heading);
-            if (dxm <= 0.05)
+            if (dxm <= 0.05f)
                 renderer_->MultMatrix(rotation_tilt);
+            renderer_->Scale(mScale);
+            mShader->UniformMatrix4fv("u_model", renderer_->model_matrix());
+            Mesh::Render();
+            renderer_->PopMatrix();
+
+            mShader->Unbind();
+
+            renderer_->ChangeTexture(NULL);
+        }
+        void VehicleRenderer::RenderTest(const vec3& ray)
+        {
+            if (!mTexture)
+                CreateTexture();
+
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+            vec3 intersection;
+            mTerrainView->IntersectionWithRay(ray, intersection);
+            vec3 pixel;
+            mTerrainView->LocalToPixel(intersection, pixel, kMSM);
+
+            renderer_->ChangeTexture(mTexture);
+
+            mShader->Bind();
+
+            renderer_->PushMatrix();
+            renderer_->Translate(pixel);
             renderer_->Scale(mScale);
             mShader->UniformMatrix4fv("u_model", renderer_->model_matrix());
             Mesh::Render();
@@ -114,7 +246,6 @@ namespace mgn {
                 renderer_->DeleteTexture(mTexture);
                 mTexture = NULL;
             }
-            Update();
         }
         void VehicleRenderer::Create()
         {

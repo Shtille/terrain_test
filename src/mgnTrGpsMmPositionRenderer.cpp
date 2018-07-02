@@ -1,7 +1,9 @@
 #include "mgnTrGpsMmPositionRenderer.h"
 
+#include "mgnTrConstants.h"
+#include "mgnTrMercatorProvider.h"
+
 #include "mgnMdTerrainView.h"
-#include "mgnMdTerrainProvider.h"
 
 #include "mgnMdWorldPoint.h"
 
@@ -12,11 +14,11 @@ namespace mgn {
             graphics::Shader * shader)
             : Mesh(renderer)
             , mTerrainView(terrain_view)
+            , mShader(shader)
             , mScale(1.0f)
             , mGpsColor(1.0f, 0.0f, 0.0f)
             , mMmColor(0.0f, 0.5f, 0.0f)
             , mExists(false)
-            , mShader(shader)
         {
             Create();
             MakeRenderable();
@@ -25,24 +27,28 @@ namespace mgn {
         {
 
         }
-        void GpsMmPositionRenderer::Update(mgnMdTerrainProvider * provider)
+        void GpsMmPositionRenderer::Update(MercatorProvider * provider)
         {
             // TODO: do 1 fetch per second, not every frame
             mgnMdWorldPoint gps_point, mm_point;
-            if (provider->fetchGpsMmPoint(&gps_point, &mm_point))
+            if (provider->FetchGpsMmPoint(&gps_point, &mm_point))
             {
+                const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
                 mExists = true;
                 float cam_dist = (float)mTerrainView->getCamDistance();
                 mScale = std::max(cam_dist * 0.01f, 1.0f);
-                double local_x, local_y;
-                mTerrainView->WorldToLocal(gps_point, local_x, local_y);
-                mGpsPosition.x = (float)local_x;
-                mGpsPosition.z = (float)local_y;
-                mGpsPosition.y = (float)provider->getAltitude(gps_point.mLatitude, gps_point.mLongitude);
-                mTerrainView->WorldToLocal(mm_point, local_x, local_y);
-                mMmPosition.x = (float)local_x;
-                mMmPosition.z = (float)local_y;
-                mMmPosition.y = (float)provider->getAltitude(mm_point.mLatitude, mm_point.mLongitude);
+                mTerrainView->LocalToPixelDistance(mScale, mScale, kMSM);
+                double latitude, longitude, altitude;
+
+                latitude = gps_point.mLatitude;
+                longitude = gps_point.mLongitude;
+                altitude = provider->GetAltitude(latitude, longitude);
+                mTerrainView->WorldToPixel(latitude, longitude, altitude, mGpsPosition, kMSM);
+
+                latitude = mm_point.mLatitude;
+                longitude = mm_point.mLongitude;
+                altitude = provider->GetAltitude(latitude, longitude);
+                mTerrainView->WorldToPixel(latitude, longitude, altitude, mMmPosition, kMSM);
             }
             else
             {

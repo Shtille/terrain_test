@@ -15,6 +15,35 @@ namespace
     const double kMinLongitude = -180;
     const double kMaxLongitude = 180;
 
+    const double kPixelsPerCm = 37.79;
+    double kZoomTable[] =
+    {
+        78271.5170*2,
+        78271.5170,
+        39135.7585,
+        19567.8792,
+        9783.9396,
+        4891.9698,
+        2445.9849,
+        1222.9925,
+        611.4962,
+        305.7481,
+        152.8741,
+        76.4370,
+        38.2185,
+        19.1093,
+        9.5546,
+        4.7773,
+        2.3887,
+        1.1943,
+        0.5972,
+        0.2986,
+        0.1493,
+        0.0746,
+        0.0373,
+        0.0187
+    };
+
     template <typename T>
     inline T Clip(T x, T min_x, T max_x)
     {
@@ -124,5 +153,9 @@ namespace Mercator
         double log_value = log(ex) * kInvLog2;
         // To not do ceil we just use +1
         return Clip(static_cast<int>(log_value)+1, min_lod, max_lod);
+    }
+    double GetNativeScale(int level_of_detail)
+    {
+        return kZoomTable[level_of_detail] * kPixelsPerCm;
     }
 }

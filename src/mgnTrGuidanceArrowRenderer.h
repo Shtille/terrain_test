@@ -8,11 +8,12 @@
 #include <boost/optional.hpp>
 
 class mgnMdTerrainView;
-class mgnMdTerrainProvider;
 class mgnMdWorldPosition;
 
 namespace mgn {
     namespace terrain {
+
+        class MercatorProvider;
 
         class GuidanceArrowRenderer {
         public:
@@ -22,7 +23,7 @@ namespace mgn {
 
             void UpdateLineWidth(float fovx, float distance_to_camera);
 
-            void Update(mgnMdTerrainProvider * provider);
+            void Update(MercatorProvider * provider);
             void Render(boost::optional<std::pair<vec2, float> > shadow);
 
             float size() const;
@@ -33,7 +34,7 @@ namespace mgn {
             void Create();
             void CreateArrow();
             void CreateExtrusion();
-            void CalcRotation(mgnMdTerrainProvider * provider);
+            void CalcRotation(MercatorProvider * provider);
 
             graphics::Renderer * renderer_;
             mgnMdTerrainView * terrain_view_;
@@ -41,6 +42,8 @@ namespace mgn {
             const mgnMdWorldPosition * gps_pos_;
 
             vec3 position_;
+            double latitude_; //!< to not do additional conversions for rotation matrix calculation
+            double longitude_;
             float heading_;
             float scale_;
             math::Matrix4 rotation_matrix_;

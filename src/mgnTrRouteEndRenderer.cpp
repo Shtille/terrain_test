@@ -1,7 +1,9 @@
 #include "mgnTrRouteEndRenderer.h"
 
+#include "mgnTrConstants.h"
+#include "mgnTrMercatorProvider.h"
+
 #include "mgnMdTerrainView.h"
-#include "mgnMdTerrainProvider.h"
 
 #include "mgnMdWorldPoint.h"
 
@@ -18,31 +20,32 @@ namespace mgn {
         {
 
         }
-        void RouteEndRenderer::Update(mgnMdTerrainProvider * provider)
+        void RouteEndRenderer::Update(MercatorProvider * provider)
         {
             // TODO: do 1 fetch per second, not every frame
             static std::vector<mgnMdWorldPoint> route_points;
             route_points.clear();
-            if (provider->fetchRouteEnd(route_points))
+            if (provider->FetchRouteEnd(route_points))
             {
+                const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+
                 mExists = true;
                 float cam_dist = (float)mTerrainView->getCamDistance();
                 mScale = std::max(cam_dist * 0.01f, 1.0f);
-                float dxm = ((float)mTerrainView->getMagnitude())/111111.f;
+                mTerrainView->LocalToPixelDistance(mScale, mScale, kMSM);
+
                 mPositions.clear();
                 for (std::vector<mgnMdWorldPoint>::const_iterator it = route_points.begin();
                     it != route_points.end(); ++it)
                 {
                     const mgnMdWorldPoint& route_point = *it;
-                    double local_x, local_y;
-                    mTerrainView->WorldToLocal(route_point, local_x, local_y);
+
+                    double latitude = route_point.mLatitude;
+                    double longitude = route_point.mLongitude;
+                    double altitude = provider->GetAltitude(latitude, longitude);
                     vec3 position;
-                    position.x = (float)local_x;
-                    position.z = (float)local_y;
-                    if (dxm > 0.05f) // since provider->fetchTerrain is retarded
-                        position.y = 0.2f;
-                    else
-                        position.y = (float)provider->getAltitude(route_point.mLatitude, route_point.mLongitude);
+                    mTerrainView->WorldToPixel(latitude, longitude, altitude, position, kMSM);
+
                     mPositions.push_back(position);
                 }
             }

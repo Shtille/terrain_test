@@ -23,6 +23,7 @@ namespace mgn {
 
             void Update();
             void Render();
+            void RenderTest(const vec3& ray);
 
             void UpdateLocationIndicator(double lat, double lon, double altitude,
                 double heading, double tilt, int color1, int color2);

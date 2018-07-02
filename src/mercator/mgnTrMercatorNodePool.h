@@ -10,16 +10,23 @@ namespace mgn {
         // Forward declarations
         class MercatorNode;
 
-        //! Mercator node pool class
-        /*! The main proposal of such a pool class is not to destroy nodes on detach.
+        /*! Mercator node pool class.
+        ** The main proposal of such a pool class is not to destroy nodes on detach.
+        ** This class has been made as LRU cache analog without memory allocations.
         */
         class MercatorNodePool {
         public:
             MercatorNodePool(int capacity);
             ~MercatorNodePool();
 
+            //! Pulls node from pool.
+            // @return Returns node if key exists and NULL otherwise.
             MercatorNode * Pull(const MercatorNodeKey& key);
-            void Push(MercatorNode * node);
+
+            //! Pushes node to pull
+            // @return Returns NULL if cache isn't full and NOT NULL if
+            //         storage is full and one node has been moved out.
+            MercatorNode * Push(MercatorNode * node);
 
         private:
             int capacity_;
