@@ -305,6 +305,24 @@ namespace mgn {
         }
         int MercatorNode::Render()
         {
+            // In case of collection grid rendering is much easier
+            if (owner_->IsCollection())
+            {
+                if (has_renderable_)
+                {
+                    // TODO: add frustum clipping
+                    if (!has_map_tile_ && !request_map_tile_)
+                    {
+                        // Request a native res map tile.
+                        request_map_tile_ = true;
+                        owner_->Request(this, MercatorTree::REQUEST_MAPTILE);
+                    }
+                    RenderSelf();
+                    return 1;
+                }
+                return 0;
+            }
+
             // Determine if this node's children are render-ready.
             bool will_render_children = true;
             for (int i = 0; i < 4; ++i)
@@ -457,10 +475,13 @@ namespace mgn {
         }
         void MercatorNode::RenderSelf()
         {
-            if (owner_->preprocess_)
-                return;
+            if (!owner_->IsCollection())
+            {
+                if (owner_->preprocess_)
+                    return;
 
-            owner_->rendered_nodes_.push_back(this);
+                owner_->rendered_nodes_.push_back(this);
+            }
 
             graphics::Shader * shader = owner_->shader_;
 

@@ -48,7 +48,7 @@ namespace mgn {
         , gps_position_(gps_position)
         , grid_size_(17)
         , frame_counter_(0)
-        , preprocess_(true)
+        , preprocess_(!IsCollection())
         , lod_freeze_(false)
         , tree_freeze_(false)
         {
@@ -169,33 +169,55 @@ namespace mgn {
                 lod_params_.camera_position = cam_position_pixel;
                 lod_params_.camera_front = frustum_->getDir();
             }
-
-            // Preprocess tree for the first time
-            if (preprocess_)
+            if (IsCollection())
             {
-                PreprocessTree();
-                preprocess_ = false;
-            }
-
-            // Handle delayed requests (for rendering new tiles).
-            HandleRenderRequests();
-
-            if (!tree_freeze_)
-            {
-                // Prune the LOD tree
-                PruneTree();
-
-                // Update LOD requests.
+                HandleRenderRequests();
                 HandleInlineRequests();
+
+                FillRenderedKeys();
+                PrepareNodes();
+            }
+            else
+            {
+                // Preprocess tree for the first time
+                if (preprocess_)
+                {
+                    PreprocessTree();
+                    preprocess_ = false;
+                }
+
+                // Handle delayed requests (for rendering new tiles).
+                HandleRenderRequests();
+
+                if (!tree_freeze_)
+                {
+                    // Prune the LOD tree
+                    PruneTree();
+
+                    // Update LOD requests.
+                    HandleInlineRequests();
+                }
             }
         }
         void MercatorTree::Render()
         {
-            rendered_nodes_.clear();
-
             shader_->Bind();
-            if (root_->WillRender())
-                root_->Render();
+            if (IsCollection())
+            {
+                for (std::vector<MercatorNode*>::const_iterator it = rendered_nodes_.begin();
+                    it != rendered_nodes_.end(); ++it)
+                {
+                    MercatorNode * node = *it;
+                    if (node->WillRender())
+                        node->Render();
+                }
+            }
+            else
+            {
+                rendered_nodes_.clear();
+                if (root_->WillRender())
+                    root_->Render();
+            }
             shader_->Unbind();
 
             ++frame_counter_;
@@ -488,7 +510,7 @@ namespace mgn {
                 node->request_renderable_ = false;
 
                 // See if any child renderables use the old map tile.
-                if (node->has_renderable_)
+                if (!IsCollection() && node->has_renderable_)
                 {
                     MercatorMapTile * old_tile = node->renderable_.GetMapTile();
                     RefreshMapTile(node, old_tile, &node->map_tile_);
@@ -621,6 +643,59 @@ namespace mgn {
             // And sort tasks queue in service
             service_->SortTasks();
         }
+        void MercatorTree::FillRenderedKeys()
+        {
+            // Determine current node
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+            int lod = terrain_view_->GetLod();
+            float tiles_per_side = static_cast<float>(1 << lod);
+            int x = static_cast<int>((lod_params_.camera_position.x / kMSM) * tiles_per_side);
+            int y = static_cast<int>((1.0f - lod_params_.camera_position.z / kMSM) * tiles_per_side);
+
+            /*
+            z
+            |
+            6 5 4
+            7 0 3
+            8 1 2 _ x
+            */
+
+            // Fill keys
+            rendered_keys_.clear();
+            rendered_keys_.push_back(MercatorNodeKey(lod, x  , y  ));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x  , y-1));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x+1, y-1));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x+1, y  ));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x+1, y+1));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x  , y+1));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x-1, y+1));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x-1, y  ));
+            rendered_keys_.push_back(MercatorNodeKey(lod, x-1, y-1));
+        }
+        void MercatorTree::PrepareNodes()
+        {
+            rendered_nodes_.clear();
+            for (std::vector<MercatorNodeKey>::const_iterator it = rendered_keys_.begin();
+                it != rendered_keys_.end(); ++it)
+            {
+                const MercatorNodeKey& key = *it;
+                MercatorNode * node;
+                AllocatedNodes::iterator ait = allocated_nodes_.find(key);
+                if (ait == allocated_nodes_.end()) // hasn't been allocated yet
+                {
+                    node = new MercatorNode(this);
+                    node->lod_ = key.lod;
+                    node->x_ = key.x;
+                    node->y_ = key.y;
+                    allocated_nodes_.insert(std::make_pair(key, node));
+                }
+                else
+                {
+                    node = ait->second;
+                }
+                rendered_nodes_.push_back(node);
+            }
+        }
         void MercatorTree::RequestTexture(MercatorNode* node)
         {
             if (!node->request_albedo_)
@@ -665,6 +740,10 @@ namespace mgn {
             return frame_counter_;
         }
         const bool MercatorTree::IsUsingPool()
+        {
+            return true;
+        }
+        const bool MercatorTree::IsCollection()
         {
             return true;
         }

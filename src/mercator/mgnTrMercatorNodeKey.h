@@ -14,6 +14,7 @@ namespace mgn {
             MercatorNodeKey(int lod, int x, int y);
 
             bool operator < (const MercatorNodeKey& other);
+            friend bool operator < (const MercatorNodeKey& lhs, const MercatorNodeKey& rhs);
             bool operator ==(const MercatorNodeKey& other);
         };
 

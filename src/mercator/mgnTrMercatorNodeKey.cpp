@@ -19,6 +19,15 @@ namespace mgn {
             else
                 return y < other.y;
         }
+        bool operator < (const MercatorNodeKey& lhs, const MercatorNodeKey& rhs)
+        {
+            if (lhs.lod != rhs.lod)
+                return lhs.lod < rhs.lod;
+            else if (lhs.x != rhs.x)
+                return lhs.x < rhs.x;
+            else
+                return lhs.y < rhs.y;
+        }
         bool MercatorNodeKey::operator ==(const MercatorNodeKey& other)
         {
             return lod == other.lod && x == other.x && y == other.y;

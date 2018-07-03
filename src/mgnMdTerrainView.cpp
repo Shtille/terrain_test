@@ -86,7 +86,7 @@ mgnMdTerrainView::mgnMdTerrainView(mgnMdWorldPoint location,int altitude):
   mAnchorRatioX(0.5f),
   mAnchorRatioY(0.75f),
   mPanMap(true),
-  mIs3D(false),
+  mIs3D(true),
   mPixelScale(1.0f),
   mZNear(1.0f),
   mZFar(1000.0f),

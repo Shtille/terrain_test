@@ -27,6 +27,7 @@ namespace mgn {
         class MercatorService;
         class MercatorProvider;
         class MercatorNodePool;
+        struct MercatorNodeKey;
         class Font;
 
 #ifdef DEBUG
@@ -95,6 +96,7 @@ namespace mgn {
             const int grid_size() const;
 
             static const bool IsUsingPool();
+            const bool IsCollection();
 
             int GetFrameCounter() const;
 
@@ -117,6 +119,9 @@ namespace mgn {
             void FlushMapTileToRoot(MercatorNode* node);
             void ProcessDoneTasks();
             void PreprocessTree();
+
+            void FillRenderedKeys();
+            void PrepareNodes();
 
             void RequestTexture(MercatorNode* node);
             void RequestHeightmap(MercatorNode* node);
@@ -160,6 +165,10 @@ namespace mgn {
 
             // Misc
             std::vector<MercatorNode*> rendered_nodes_; //!< for optimized rendering of labels and other data
+
+            std::vector<MercatorNodeKey> rendered_keys_;
+            typedef std::map<MercatorNodeKey, MercatorNode*> AllocatedNodes;
+            std::map<MercatorNodeKey, MercatorNode*> allocated_nodes_;
 
             typedef std::map<size_t, graphics::Texture*> IconTextureCache;
             IconTextureCache icon_texture_cache_;
