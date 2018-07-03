@@ -510,7 +510,7 @@ namespace mgn {
                 node->request_renderable_ = false;
 
                 // See if any child renderables use the old map tile.
-                if (!IsCollection() && node->has_renderable_)
+                if (node->has_renderable_)
                 {
                     MercatorMapTile * old_tile = node->renderable_.GetMapTile();
                     RefreshMapTile(node, old_tile, &node->map_tile_);
@@ -662,15 +662,19 @@ namespace mgn {
 
             // Fill keys
             rendered_keys_.clear();
-            rendered_keys_.push_back(MercatorNodeKey(lod, x  , y  ));
-            rendered_keys_.push_back(MercatorNodeKey(lod, x  , y-1));
-            rendered_keys_.push_back(MercatorNodeKey(lod, x+1, y-1));
-            rendered_keys_.push_back(MercatorNodeKey(lod, x+1, y  ));
-            rendered_keys_.push_back(MercatorNodeKey(lod, x+1, y+1));
-            rendered_keys_.push_back(MercatorNodeKey(lod, x  , y+1));
-            rendered_keys_.push_back(MercatorNodeKey(lod, x-1, y+1));
-            rendered_keys_.push_back(MercatorNodeKey(lod, x-1, y  ));
-            rendered_keys_.push_back(MercatorNodeKey(lod, x-1, y-1));
+            const int kNodeShift = 3;
+            for (int j = y - kNodeShift; j <= y + kNodeShift; ++j)
+                for (int i = x - kNodeShift; i <= x + kNodeShift; ++i)
+                    rendered_keys_.push_back(MercatorNodeKey(lod, i, j));
+            // rendered_keys_.push_back(MercatorNodeKey(lod, x  , y  ));
+            // rendered_keys_.push_back(MercatorNodeKey(lod, x  , y-1));
+            // rendered_keys_.push_back(MercatorNodeKey(lod, x+1, y-1));
+            // rendered_keys_.push_back(MercatorNodeKey(lod, x+1, y  ));
+            // rendered_keys_.push_back(MercatorNodeKey(lod, x+1, y+1));
+            // rendered_keys_.push_back(MercatorNodeKey(lod, x  , y+1));
+            // rendered_keys_.push_back(MercatorNodeKey(lod, x-1, y+1));
+            // rendered_keys_.push_back(MercatorNodeKey(lod, x-1, y  ));
+            // rendered_keys_.push_back(MercatorNodeKey(lod, x-1, y-1));
         }
         void MercatorTree::PrepareNodes()
         {

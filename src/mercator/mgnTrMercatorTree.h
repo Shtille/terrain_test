@@ -167,7 +167,7 @@ namespace mgn {
             std::vector<MercatorNode*> rendered_nodes_; //!< for optimized rendering of labels and other data
 
             std::vector<MercatorNodeKey> rendered_keys_;
-            typedef std::map<MercatorNodeKey, MercatorNode*> AllocatedNodes;
+            typedef std::map<MercatorNodeKey, MercatorNode*> AllocatedNodes; // TODO: replace on LRU cache
             std::map<MercatorNodeKey, MercatorNode*> allocated_nodes_;
 
             typedef std::map<size_t, graphics::Texture*> IconTextureCache;
