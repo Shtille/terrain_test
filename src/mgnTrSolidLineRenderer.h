@@ -50,7 +50,7 @@ namespace mgn {
         {
         public:
             SolidLineSegment();
-            SolidLineSegment(const vec2& b, const vec2& e, const TerrainTile * tile, float width, bool modified = false);
+            SolidLineSegment(const vec2& b, const vec2& e, const TerrainTile * tile, float width);
             SolidLineSegment(const mgnMdWorldPoint& cur, const mgnMdWorldPoint& next, const TerrainTile * tile, float width);
             ~SolidLineSegment();
 
@@ -60,11 +60,15 @@ namespace mgn {
             TerrainTile const * getTile() const;
             float width() const;
             bool needToAlloc() const; //!< returns true if data should be allocated
-            bool beenModified() const;
             bool hasData() const; //!< returns true if any data has been allocated
+            bool trimmed() const;
 
             void prepare(graphics::Renderer * renderer, const std::vector<vec2>& vertices);
             void render(const math::Frustum& frustum); //!< render segment
+
+            void trimFully();
+            void trimPartly(const vec2& begin, const vec2& end);
+            void restore();
 
         protected:
             float WidthCalculation(const TerrainTile * tile, float width);
@@ -79,9 +83,10 @@ namespace mgn {
 
             vec2 mBegin;    //!< begin point in tile CS
             vec2 mEnd;      //!< end point in tile CS
+            vec2 mOriginalBegin; //!< needed for partial trim
             float mWidth;
             bool mNeedToAlloc;
-            bool mBeenModified; //!< first segment modification on highlight trimming
+            bool mTrimmed;
         };
 
         struct SolidLineFetchData

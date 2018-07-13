@@ -89,16 +89,17 @@ namespace mgn {
             , mTerrainTile(NULL)
             , mWidth(kTrackWidth)
             , mNeedToAlloc(false)
-            , mBeenModified(false)
+            , mTrimmed(false)
         {
         }
-        SolidLineSegment::SolidLineSegment(const vec2& b, const vec2& e, const TerrainTile * tile, float width, bool modified)
+        SolidLineSegment::SolidLineSegment(const vec2& b, const vec2& e, const TerrainTile * tile, float width)
             : mRenderData(NULL)
             , mTerrainTile(tile)
             , mBegin(b)
             , mEnd(e)
+            , mOriginalBegin(b)
             , mNeedToAlloc(true)
-            , mBeenModified(modified)
+            , mTrimmed(false)
         {
             mWidth = WidthCalculation(tile, width);
         }
@@ -106,7 +107,7 @@ namespace mgn {
             : mRenderData(NULL)
             , mTerrainTile(tile)
             , mNeedToAlloc(true)
-            , mBeenModified(false)
+            , mTrimmed(false)
         {
             assert(tile);
             mWidth = WidthCalculation(tile, width);
@@ -116,6 +117,7 @@ namespace mgn {
             tile->worldToTile(next.mLatitude,
                               next.mLongitude,
                               mEnd.x, mEnd.y);
+            mOriginalBegin = mBegin;
         }
         SolidLineSegment::~SolidLineSegment()
         {
@@ -145,13 +147,13 @@ namespace mgn {
         {
             return mNeedToAlloc;
         }
-        bool SolidLineSegment::beenModified() const
-        {
-            return mBeenModified;
-        }
         bool SolidLineSegment::hasData() const
         {
             return mRenderData != NULL;
+        }
+        bool SolidLineSegment::trimmed() const
+        {
+            return mTrimmed;
         }
         float SolidLineSegment::WidthCalculation(const TerrainTile * tile, float width)
         {
@@ -171,6 +173,7 @@ namespace mgn {
                 // Prepare may fail due to some memory issues
                 delete mRenderData;
                 mRenderData = NULL;
+                mNeedToAlloc = true;
             }
         }
         void SolidLineSegment::render(const math::Frustum& frustum)
@@ -188,6 +191,40 @@ namespace mgn {
                 if (frustum.IsPolygonIn(num_points, points))
                     mRenderData->render();
             }
+        }
+        void SolidLineSegment::trimFully()
+        {
+            if (mRenderData)
+            {
+                delete mRenderData;
+                mRenderData = NULL;
+            }
+            mBegin = mOriginalBegin;
+            mNeedToAlloc = false;
+            mTrimmed = true;
+        }
+        void SolidLineSegment::trimPartly(const vec2& begin, const vec2& end)
+        {
+            if (mRenderData)
+            {
+                delete mRenderData;
+                mRenderData = NULL;
+            }
+            mBegin = begin;
+            mEnd = end;
+            mNeedToAlloc = true;
+            mTrimmed = true;
+        }
+        void SolidLineSegment::restore()
+        {
+            if (mRenderData) // partly trimmed segment may have render data
+            {
+                delete mRenderData;
+                mRenderData = NULL;
+            }
+            mBegin = mOriginalBegin;
+            mNeedToAlloc = true;
+            mTrimmed = false;
         }
         //=======================================================================
         SolidLineChunk::SolidLineChunk(SolidLineRenderer * owner, TerrainTile const * tile)

@@ -14,11 +14,12 @@
 #include <list>
 
 class mgnMdTerrainView;
-class mgnMdTerrainProvider;
 class mgnMdWorldPosition;
 
 namespace mgn {
     namespace terrain {
+
+        class MercatorProvider;
 
         struct DottedLinePointInfo
         {
@@ -44,8 +45,8 @@ namespace mgn {
                 // altitude stores in local.position.y
             } world;
 
-            void set_begin(mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * provider, float& minh, float& maxh);
-            void obtain_position(mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * provider, float offset_x, float offset_y, float& minh, float& maxh);
+            void set_begin(mgnMdTerrainView * terrain_view, MercatorProvider * provider, float& minh, float& maxh);
+            void obtain_position(mgnMdTerrainView * terrain_view, MercatorProvider * provider, float offset_x, float offset_y, float& minh, float& maxh);
             void fill_rotation(const vec3& vx, const vec3& vy, const vec3& vz);
         };
 
@@ -83,7 +84,7 @@ namespace mgn {
         {
         public:
 
-            DottedLineRenderer(graphics::Renderer * renderer, mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * provider,
+            DottedLineRenderer(graphics::Renderer * renderer, mgnMdTerrainView * terrain_view, MercatorProvider * provider,
                 graphics::Shader * shader, const mgnMdWorldPosition * gps_pos);
             virtual ~DottedLineRenderer();
 
@@ -130,7 +131,7 @@ namespace mgn {
 
             graphics::Renderer * renderer_;
             mgnMdTerrainView * terrain_view_;
-            mgnMdTerrainProvider * provider_;
+            MercatorProvider * provider_;
             graphics::Shader * shader_;
             const mgnMdWorldPosition * gps_pos_;
 

@@ -86,7 +86,7 @@ mgnMdTerrainView::mgnMdTerrainView(mgnMdWorldPoint location,int altitude):
   mAnchorRatioX(0.5f),
   mAnchorRatioY(0.75f),
   mPanMap(true),
-  mIs3D(true),
+  mIs3D(false),
   mPixelScale(1.0f),
   mZNear(1.0f),
   mZFar(1000.0f),
@@ -711,27 +711,16 @@ void mgnMdTerrainView::IntersectionWithRay(const vec3& ray, vec3& intersection) 
 void mgnMdTerrainView::IntersectionWithRayPixel(const vec3& ray, vec3& intersection) const
 {
     const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
-    //if (!mTerrainProvider ||
-    //    getCamTiltRad() > 1.0 && // High altitudes, use approximate approach
-    //    ray.y < 0.0f)
+    if (!mTerrainProvider ||
+        getCamTiltRad() > 1.0 && // High altitudes, use approximate approach
+        ray.y < 0.0f)
     {
-        /*
         vec3 origin = getCamPosition();
         LocalToPixel(origin, origin, kMSM);
         float d = -(float)getCenterHeight();
         LocalToPixelDistance(d, d, kMSM);
         float t = -(origin.y + d)/ray.y;
         intersection = origin + t * ray;
-        */
-        vec3 origin = getCamPosition();
-        LocalToPixel(origin, origin, kMSM);
-        float d = -(float)getCenterHeight();
-        LocalToPixelDistance(d, d, kMSM);
-        double t = -((double)origin.y + (double)d)/(double)ray.y;
-        intersection.x = origin.x + static_cast<float>(t * ray.x);
-        intersection.y = origin.y + static_cast<float>(t * ray.y);
-        intersection.z = origin.z + static_cast<float>(t * ray.z);
-        return;
     }
     mgnMdWorldPoint world_point;
     float distance = getLargestCamDistance();

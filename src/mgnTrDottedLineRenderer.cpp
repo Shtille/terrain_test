@@ -1,8 +1,8 @@
 #include "mgnTrDottedLineRenderer.h"
 #include "mgnTrConstants.h"
+#include "mgnTrMercatorProvider.h"
 
 #include "mgnMdTerrainView.h"
-#include "mgnMdTerrainProvider.h"
 
 #include <cmath>
 #include <cstddef>
@@ -10,26 +10,26 @@
 namespace mgn {
     namespace terrain {
 
-        void DottedLinePointInfo::set_begin(mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * provider, float& minh, float& maxh)
+        void DottedLinePointInfo::set_begin(mgnMdTerrainView * terrain_view, MercatorProvider * provider, float& minh, float& maxh)
         {
             const float dxm = ((float)terrain_view->getMagnitude())/111111.0f;
             local.position.x = 0.0f;
             local.position.z = 0.0f;
-            local.position.y = (float)provider->getAltitude(
+            local.position.y = (float)provider->GetAltitude(
                 world.point.mLatitude,
                 world.point.mLongitude,
                 dxm);
             minh = local.position.y;
             maxh = local.position.y;
         }
-        void DottedLinePointInfo::obtain_position(mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * provider, float offset_x, float offset_y, float& minh, float& maxh)
+        void DottedLinePointInfo::obtain_position(mgnMdTerrainView * terrain_view, MercatorProvider * provider, float offset_x, float offset_y, float& minh, float& maxh)
         {
             const float dxm = ((float)terrain_view->getMagnitude())/111111.0f;
             double local_x, local_y;
             terrain_view->WorldToLocal(world.point, local_x, local_y);
             local.position.x = (float)local_x - offset_x;
             local.position.z = (float)local_y - offset_y;
-            local.position.y = (float)provider->getAltitude(
+            local.position.y = (float)provider->GetAltitude(
                 world.point.mLatitude,
                 world.point.mLongitude,
                 dxm);
@@ -64,7 +64,7 @@ namespace mgn {
             rotation.matrix.sa[15] = 1.0f;
         }
 
-        DottedLineRenderer::DottedLineRenderer(graphics::Renderer * renderer, mgnMdTerrainView * terrain_view, mgnMdTerrainProvider * provider,
+        DottedLineRenderer::DottedLineRenderer(graphics::Renderer * renderer, mgnMdTerrainView * terrain_view, MercatorProvider * provider,
                 graphics::Shader * shader, const mgnMdWorldPosition * gps_pos)
             : renderer_(renderer)
             , terrain_view_(terrain_view)
@@ -232,10 +232,10 @@ namespace mgn {
             double d = circle_size * elementSize() * 1.41;
             double dlon = d / terrain_view_->getMetersPerLongitude();
             double dlat = d / terrain_view_->getMetersPerLatitude();
-            float h_x_plus  = (float)provider_->getAltitude(point.world.point.mLatitude, point.world.point.mLongitude + dlon, dxm); // x+1
-            float h_x_minus = (float)provider_->getAltitude(point.world.point.mLatitude, point.world.point.mLongitude - dlon, dxm); // x-1
-            float h_y_plus  = (float)provider_->getAltitude(point.world.point.mLatitude + dlat, point.world.point.mLongitude, dxm); // y+1
-            float h_y_minus = (float)provider_->getAltitude(point.world.point.mLatitude - dlat, point.world.point.mLongitude, dxm); // y-1
+            float h_x_plus  = (float)provider_->GetAltitude(point.world.point.mLatitude, point.world.point.mLongitude + dlon, dxm); // x+1
+            float h_x_minus = (float)provider_->GetAltitude(point.world.point.mLatitude, point.world.point.mLongitude - dlon, dxm); // x-1
+            float h_y_plus  = (float)provider_->GetAltitude(point.world.point.mLatitude + dlat, point.world.point.mLongitude, dxm); // y+1
+            float h_y_minus = (float)provider_->GetAltitude(point.world.point.mLatitude - dlat, point.world.point.mLongitude, dxm); // y-1
             float sx = h_x_plus - h_x_minus;
             float sy = h_y_plus - h_y_minus;
             // assume that tile cell sizes in both directions are the same
@@ -284,17 +284,17 @@ namespace mgn {
                 double dlon = d / terrain_view_->getMetersPerLongitude();
                 double dlat = d / terrain_view_->getMetersPerLatitude();
                 float sx =      
-                    (float)provider_->getAltitude(point.world.point.mLatitude, 
+                    (float)provider_->GetAltitude(point.world.point.mLatitude, 
                                                                      point.world.point.mLongitude + dlon,
                                                                      dxm) - // x+1
-                    (float)provider_->getAltitude(point.world.point.mLatitude,
+                    (float)provider_->GetAltitude(point.world.point.mLatitude,
                                                                      point.world.point.mLongitude - dlon,
                                                                      dxm);  // x-1
                 float sy =      
-                    (float)provider_->getAltitude(point.world.point.mLatitude + dlat, 
+                    (float)provider_->GetAltitude(point.world.point.mLatitude + dlat, 
                                                                      point.world.point.mLongitude,
                                                                      dxm) - // y+1
-                    (float)provider_->getAltitude(point.world.point.mLatitude - dlat,
+                    (float)provider_->GetAltitude(point.world.point.mLatitude - dlat,
                                                                      point.world.point.mLongitude,
                                                                      dxm);  // y-1
                 // assume that tile cell sizes in both directions are the same
@@ -316,16 +316,16 @@ namespace mgn {
                 p0.y = (float)point.local.position.y;
                 p1.x = (float)local_y;
                 p1.z = (float)(local_x + d);
-                p1.y = (float)provider_->getAltitude(point.world.point.mLatitude, point.world.point.mLongitude + dlon);
+                p1.y = (float)provider_->GetAltitude(point.world.point.mLatitude, point.world.point.mLongitude + dlon);
                 p2.x = (float)(local_y + d);
                 p2.z = (float)local_x;
-                p2.y = (float)provider_->getAltitude(point.world.point.mLatitude + dlat, point.world.point.mLongitude);
+                p2.y = (float)provider_->GetAltitude(point.world.point.mLatitude + dlat, point.world.point.mLongitude);
                 p3.x = (float)local_y;
                 p3.z = (float)(local_x - d);
-                p3.y = (float)provider_->getAltitude(point.world.point.mLatitude, point.world.point.mLongitude - dlon);
+                p3.y = (float)provider_->GetAltitude(point.world.point.mLatitude, point.world.point.mLongitude - dlon);
                 p4.x = (float)(local_y - d);
                 p4.z = (float)local_x;
-                p4.y = (float)provider_->getAltitude(point.world.point.mLatitude - dlat, point.world.point.mLongitude);
+                p4.y = (float)provider_->GetAltitude(point.world.point.mLatitude - dlat, point.world.point.mLongitude);
                 vec3 n1 = (p1 - p0) ^ (p2 - p0);
                 vec3 n2 = (p2 - p0) ^ (p3 - p0);
                 vec3 n3 = (p3 - p0) ^ (p4 - p0);

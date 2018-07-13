@@ -157,6 +157,20 @@ namespace mgn {
                     for (std::list<SolidLineSegment*>::iterator it = part.segments.begin(); it != part.segments.end(); ++it)
                     {
                         SolidLineSegment * segment = *it;
+                        // Check following segments that may been trimmed earlier
+                        if (found_segment)
+                        {
+                            if (segment->trimmed())
+                            {
+                                // Restore segment that was trimmed earlier
+                                segment->restore();
+                            }
+                            else
+                            {
+                                break; // no need to check further segments
+                            }
+                            continue; // matching cut segment is already found
+                        }
                         vec2 line = segment->end() - segment->begin();
                         float len = line.Length();
                         if (len < clipping::eps) // zero length segment
@@ -175,16 +189,19 @@ namespace mgn {
                                 found_segment = true;
                                 // Make projected position to current segment
                                 vec2 projected_pos = segment->begin() + t * line;
-                                // Trim current part
                                 vec2 segment_end = segment->end();
+                                // Trim without deletion
                                 std::list<SolidLineSegment*>::iterator it_found = it;
-                                std::list<SolidLineSegment*>::iterator it_next = it_found; ++it_next;
-                                for (std::list<SolidLineSegment*>::iterator it = part.segments.begin(); it != it_next; ++it)
-                                    delete *it;
-                                part.segments.erase(part.segments.begin(), it_next);
-                                const float kTrackWidth = ht_renderer->mTrackWidth;
-                                part.segments.push_front(new SolidLineSegment(projected_pos, segment_end, mTile, kTrackWidth, true));
-                                // Trim highlight stubs
+                                for (std::list<SolidLineSegment*>::iterator it = part.segments.begin(); it != it_found; ++it)
+                                {
+                                    SolidLineSegment * trimmed_segment = *it;
+                                    trimmed_segment->trimFully();
+                                }
+                                {
+                                    SolidLineSegment * trimmed_segment = *it_found;
+                                    trimmed_segment->trimPartly(projected_pos, segment_end);
+                                }
+                                // Trim highlight stubs (that may appear during part switch)
                                 for (std::vector<Part>::iterator itp = mParts.begin(); itp != mParts.end(); ++itp)
                                 {
                                     Part& selected_part = *itp;
@@ -192,23 +209,21 @@ namespace mgn {
                                         (&selected_part != &part)) // current part differs from selected
                                     {
                                         SolidLineSegment * segment = selected_part.segments.front();
-                                        if (segment->beenModified())
+                                        if (segment->trimmed())
                                         {
-                                            delete segment;
-                                            selected_part.segments.clear();
+                                            segment->trimFully();
                                         }
                                     }
                                 }
-
-                                createSegments();
-                                fetchTriangles();
-                                generateData(); // push render data to load immediately
-                                break;
                             }
                         }
                     }
-                    if (found_segment)
-                        break;
+                }
+                if (found_segment)
+                {
+                    createSegments();
+                    fetchTriangles();
+                    generateData(); // push render data to load immediately
                 }
             }
         }

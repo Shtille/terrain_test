@@ -258,8 +258,19 @@ namespace mgn {
         static bool check_memory = false;
         if (check_memory)
         {
-            unsigned int memory_size = mRenderer->GetUsedVideoMemorySize();
-            LOG_INFO(0, ("Memory: %u", memory_size));
+            //unsigned int memory_size = mRenderer->GetUsedVideoMemorySize();
+            //LOG_INFO(0, ("Memory: %u", memory_size));
+
+            const math::Matrix4& proj = mRenderer->projection_matrix();
+            const math::Matrix4& view = mRenderer->view_matrix();
+            const math::Vector4& viewport = mRenderer->viewport();
+            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
+            vec3 pixel;
+            mTerrainView->PixelLocation(pixel, kMSM);
+            math::Vector4 world_point(pixel, 1.0f);
+            math::Vector2 screen_point;
+            math::WorldToScreen(world_point, proj, view, viewport, screen_point);
+            LOG_INFO(0, ("screen (%.3f, %.3f)", screen_point.x, screen_point.y));
         }
 
         mMercatorTree->RenderLabels();
@@ -306,6 +317,7 @@ namespace mgn {
     }
     void Renderer::UpdateProjectionMatrix()
     {
+        const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
         if (mTerrainView->Is3D())
         {
             float zfar = mTerrainView->getZFar();
@@ -319,37 +331,29 @@ namespace mgn {
                 mFovX *= mFovX / old_fovy;
             }
             mLocalProjectionMatrix = math::RetardedPerspectiveMatrix(mFovX, mSizeX, mSizeY, znear, zfar);
-#ifdef MGNTR_MERCATOR_TILE
-            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
             mTerrainView->LocalToPixelDistance(zfar, zfar, kMSM);
             mTerrainView->LocalToPixelDistance(znear, znear, kMSM);
-#endif
             mRenderer->SetProjectionMatrix(math::RetardedPerspectiveMatrix(mFovX, mSizeX, mSizeY, znear, zfar));
         }
         else // 2D
         {
+            float camera_distance = 0.5f * (float)mTerrainView->getCamDistance();
             float aspect_ratio = mRenderer->aspect_ratio();
-            float left = 0.0f;
-            float right = aspect_ratio;
-            float bottom = 0.0f;
-            float top = 1.0f;
+            float left = -camera_distance * aspect_ratio;
+            float right = camera_distance * aspect_ratio;
+            float bottom = -camera_distance;
+            float top = camera_distance;
             float znear = mTerrainView->getZNear();
             float zfar = mTerrainView->getZFar();
-            float rl = right - left;
-            float tb = top - bottom;
-            float fn = zfar - znear;
-
-            math::Matrix4 mat(
-                2.0f / rl, 0.0f, 0.0f, 0.0f,
-                0.0f, 2.0f / tb, 0.0f, 0.0f,
-                0.0f, 0.0f, -2.0f / fn, 0.0f,
-                -(right + left) / rl, -(top + bottom) / tb, -(zfar + znear) / fn, 1.0f);
-            const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
-            mLocalProjectionMatrix = math::OrthoMatrix(left, right, bottom, top, znear, zfar);
+            mLocalProjectionMatrix = math::RetardedOrthoMatrix(left, right, bottom, top, znear, zfar);
+            mTerrainView->LocalToPixelDistance(left, left, kMSM);
+            mTerrainView->LocalToPixelDistance(right, right, kMSM);
+            mTerrainView->LocalToPixelDistance(bottom, bottom, kMSM);
+            mTerrainView->LocalToPixelDistance(top, top, kMSM);
             mTerrainView->LocalToPixelDistance(zfar, zfar, kMSM);
             mTerrainView->LocalToPixelDistance(znear, znear, kMSM);
-            math::Matrix4 proj = math::OrthoMatrix(left, right, bottom, top, znear, zfar);
-            mRenderer->SetProjectionMatrix(mat);
+            math::Matrix4 proj = math::RetardedOrthoMatrix(left, right, bottom, top, znear, zfar);
+            mRenderer->SetProjectionMatrix(proj);
         }
     }
     void Renderer::UpdateViewMatrix()
@@ -358,6 +362,8 @@ namespace mgn {
         float camera_tilt = (float)mTerrainView->getCamTiltRad();
         float camera_heading = (float)mTerrainView->getCamHeadingRad();
         float center_height = (float)mTerrainView->getCenterHeight();
+        if (!mTerrainView->Is3D()) // 2D
+            camera_tilt = math::kHalfPi;
 
 #ifdef MGNTR_MERCATOR_TILE
         const float kMSM = static_cast<float>(mgn::terrain::GetMapSizeMax());
@@ -585,6 +591,8 @@ namespace mgn {
         float camera_tilt = (float)mTerrainView->getCamTiltRad();
         float camera_heading = (float)mTerrainView->getCamHeadingRad();
         float center_height = (float)mTerrainView->getCenterHeight();
+        if (!mTerrainView->Is3D()) // 2D
+            camera_tilt = math::kHalfPi;
 
         math::Matrix4 view_matrix;
         view_matrix = math::Scale4(1.0f, -1.0f, 1.0f);
@@ -646,7 +654,7 @@ namespace mgn {
     }
     void Renderer::IntersectionWithRay(const math::Vector3& ray, math::Vector3& intersection) const
     {
-        mTerrainView->IntersectionWithRay(ray, intersection);
+        mTerrainView->IntersectionWithRayPixel(ray, intersection);
     }
     void Renderer::GetSelectedIcons(int x, int y, int radius, std::vector<int>& ids) const
     {
