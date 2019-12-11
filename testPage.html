@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+<head>
+ <title>Custom Page Add-In</title>
+ <script>
+  geotab.addin.myCustomPage1 = () => {
+   // Initialize required Add-In variables
+   // Example:
+   // var element = document.getElementById("myButton");
+   // if (element) {
+   //     element.addEventListener("click", function (event) {
+   //         event.preventDefault();
+   //         alert("Action performed");
+   //     });
+   // }
+   return {
+    initialize(api, state, callback) {
+     callback();
+    },
+    focus(api, state) {
+     // User interface is available
+    },
+    blur(api, state) {
+     // Save any Add-In state
+    }
+   };
+  };
+ </script>
+</head>
+<body>
+ <button id="myButton">Do Action</button>
+</body>
+</html>
